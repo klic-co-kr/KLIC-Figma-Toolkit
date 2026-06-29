@@ -206,6 +206,10 @@ const figma = {
     },
   },
   showUI() {},
+  commitUndoCount: 0,
+  commitUndo() {
+    this.commitUndoCount++;
+  },
   createRectangle() {
     return new RectangleNode();
   },
@@ -726,5 +730,17 @@ assert(dtcgJson.color?.['KLIC Smoke Test']?.Smoke?.Primary?.$type === 'color', '
 assert(dtcgJson.color['KLIC Smoke Test'].Smoke.Primary.$value === '#12A0FB', 'DTCG JSON should preserve token hex value');
 assert(handoffJson.dtcg && handoffJson.dtcg.format === 'DTCG', 'handoff export JSON should reference DTCG payload metadata');
 assert(handoffExport.summary && handoffExport.summary.tokenCount === handoffJson.tokens.length, 'handoff export should include machine-readable summary');
+
+// ── Batch Auto-Fix: engine skeleton ──
+figma.commitUndoCount = 0;
+await figma.ui.onmessage({ type: 'command-collect-fixes', scope: 'page', options: { scanLimit: 500 } });
+const fixesPreview = latestMessage('command-fixes-preview');
+assert(fixesPreview, 'command-collect-fixes did not post command-fixes-preview');
+assert(typeof fixesPreview.counts === 'object', 'fixes preview should include counts object');
+
+await figma.ui.onmessage({ type: 'command-apply-fixes', tier: 'AB' });
+const fixesApplied = latestMessage('command-fixes-applied');
+assert(fixesApplied, 'command-apply-fixes did not post command-fixes-applied');
+assert(figma.commitUndoCount >= 1, 'apply-fixes must call figma.commitUndo so users can undo fixes');
 
 console.log('Mock Figma runtime smoke test passed.');
