@@ -1,8 +1,0 @@
-{
-  "name": "스타일 가이드 변수 생성기",
-  "id": "com.plugin.style-guide-variables",
-  "api": "1.0.0",
-  "main": "code.js",
-  "ui": "ui.html",
-  "editorType": ["figma"]
-}
