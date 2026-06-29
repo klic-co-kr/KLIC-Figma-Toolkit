@@ -743,4 +743,22 @@ const fixesApplied = latestMessage('command-fixes-applied');
 assert(fixesApplied, 'command-apply-fixes did not post command-fixes-applied');
 assert(figma.commitUndoCount >= 1, 'apply-fixes must call figma.commitUndo so users can undo fixes');
 
+// ── Batch Auto-Fix: bindRawColor (Tier A) ──
+const fixVar = figma.variables.createVariable('Fix/Primary', collections[0], 'COLOR');
+fixVar.valuesByMode[collections[0].defaultModeId] = { r: 0.2, g: 0.4, b: 0.8 };
+const rawRect = figma.createRectangle();
+rawRect.name = 'Raw Fill Rect';
+rawRect.fills = [{ type: 'SOLID', color: { r: 0.2, g: 0.4, b: 0.8 }, opacity: 1 }];
+page.appendChild(rawRect);
+page.selection = [rawRect];
+
+await figma.ui.onmessage({ type: 'command-collect-fixes', scope: 'selection', options: { scanLimit: 100 } });
+const bindPreview = latestMessage('command-fixes-preview');
+assert(bindPreview.counts.A >= 1, 'bindRawColor should contribute a Tier A fix for an exact-match raw color');
+const bindItem = bindPreview.items.find((it) => it.providerId === 'bindRawColor');
+assert(bindItem, 'preview should include a bindRawColor item');
+
+await figma.ui.onmessage({ type: 'command-apply-fixes', tier: 'AB' });
+assert(rawRect.fills[0].boundVariables && rawRect.fills[0].boundVariables.color, 'bindRawColor should bind the matching variable to the paint');
+
 console.log('Mock Figma runtime smoke test passed.');

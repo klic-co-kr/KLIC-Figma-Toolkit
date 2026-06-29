@@ -1302,8 +1302,33 @@ async function commandCollectFixes(msg) {
   }
 }
 
-// Task 2+ 에서 감사별 디스크립터 수집을 채운다. Task 1 은 no-op.
+var commandFixIdSeq = 0;
+function commandNextFixId() {
+  commandFixIdSeq++;
+  return 'fix-' + commandFixIdSeq;
+}
+
 function commandGatherFixDescriptors(snapshot, queue) {
+  var previewItems = (snapshot && snapshot.previewItems) || [];
+  for (var i = 0; i < previewItems.length; i++) {
+    var item = previewItems[i];
+    if (item.matchType === 'rgb-exact' && item.variableId && item.nodeId) {
+      queue.push({
+        id: commandNextFixId(),
+        providerId: 'bindRawColor',
+        tier: 'A',
+        label: 'Bind ' + (item.nodeName || item.nodeId) + ' → ' + (item.variableName || item.variableId),
+        preview: { before: item.hex || 'raw color', after: item.variableName || 'variable' },
+        payload: {
+          nodeId: item.nodeId,
+          property: item.property,
+          paintIndex: item.paintIndex,
+          variableId: item.variableId,
+          matchType: 'rgb-exact',
+        },
+      });
+    }
+  }
   return queue;
 }
 
@@ -1326,12 +1351,18 @@ async function commandApplyFixes(msg) {
       var ok = await provider.apply(item.payload);
       if (ok) applied++; else skipped++;
     }
-    figma.commitUndo();
     figma.ui.postMessage({ type: 'command-fixes-applied', applied: applied, skipped: skipped, tier: msg.tier || 'items' });
   } catch (err) {
     figma.ui.postMessage({ type: 'command-error', message: err.message || String(err) });
+  } finally {
+    figma.commitUndo();
   }
 }
+
+/* ── Provider: bindRawColor (Tier A) ── */
+commandRegisterFixProvider('bindRawColor', 'A', async function (payload) {
+  return await commandApplySingleColorBinding(payload);
+});
 
 /* ═══════════════════════════════════════════════════════════════════════════
    MODULE: MENU PAGE GENERATOR
