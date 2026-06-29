@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 12px; color: #1a1a2e; background: #fff;
+}
+.header {
+  background: #1a1a2e; color: #fff;
+  padding: 12px 16px; font-size: 14px; font-weight: 600;
+  letter-spacing: -0.2px;
+}
+.content { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+
+.section-label {
+  display: block; font-size: 10.5px; font-weight: 600;
+  color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+/* ── 탭 ── */
+.tab-bar {
+  display: flex; border-bottom: 1.5px solid #e5e7eb;
+}
+.tab-btn {
+  flex: 1; padding: 7px 0;
+  background: none; border: none; cursor: pointer;
+  font-size: 12px; font-weight: 500; color: #9ca3af;
+  border-bottom: 2px solid transparent; margin-bottom: -1.5px;
+  transition: color .15s, border-color .15s;
+}
+.tab-btn.active { color: #7c3aed; border-bottom-color: #7c3aed; font-weight: 600; }
+
+/* ── 패널 ── */
+.pane { display: none; flex-direction: column; gap: 8px; }
+.pane.active { display: flex; }
+
+/* ── 텍스트 에어리어 ── */
+textarea {
+  width: 100%; resize: vertical;
+  border: 1.5px solid #e5e7eb; border-radius: 6px;
+  padding: 8px 10px; font-size: 11.5px; font-family: inherit;
+  color: #1a1a2e; line-height: 1.6;
+  transition: border-color .15s; outline: none;
+}
+textarea:focus { border-color: #7c3aed; }
+textarea::placeholder { color: #b0b3bc; }
+.ta-unified { height: 100px; }
+.ta-section { height: 62px; }
+
+.sub-label { font-size: 11.5px; font-weight: 600; color: #374151; margin-bottom: 3px; }
+.optional { font-size: 10px; font-weight: 400; color: #9ca3af; margin-left: 4px; }
+
+.detected {
+  font-size: 11px; min-height: 15px;
+  display: flex; align-items: center; gap: 4px;
+}
+.detected.ok   { color: #059669; font-weight: 500; }
+.detected.idle { color: #9ca3af; }
+
+/* ── 토글 ── */
+.toggles { display: flex; gap: 16px; flex-wrap: wrap; }
+.toggle {
+  display: flex; align-items: center; gap: 6px;
+  cursor: pointer; user-select: none;
+}
+.toggle input { cursor: pointer; accent-color: #7c3aed; width: 13px; height: 13px; }
+.toggle span { font-size: 12px; }
+
+/* ── 테이블 너비 ── */
+.tw-row { display: flex; align-items: center; gap: 8px; }
+.tw-row label { font-size: 12px; color: #374151; white-space: nowrap; }
+.tw-row input[type=number] {
+  width: 80px; border: 1.5px solid #e5e7eb; border-radius: 5px;
+  padding: 5px 8px; font-size: 12px; outline: none;
+  transition: border-color .15s;
+}
+.tw-row input[type=number]:focus { border-color: #7c3aed; }
+.unit { font-size: 11px; color: #9ca3af; }
+
+/* ── 색상 설정 ── */
+.color-rows { display: flex; flex-direction: column; gap: 5px; }
+.color-row { display: flex; align-items: center; gap: 5px; }
+.color-label { font-size: 11px; color: #374151; min-width: 62px; flex-shrink: 0; }
+.var-sel {
+  flex: 1; min-width: 0;
+  border: 1.5px solid #e5e7eb; border-radius: 5px;
+  padding: 4px 5px; font-size: 10.5px; color: #1a1a2e;
+  background: #fff; outline: none; cursor: pointer;
+  transition: border-color .15s; height: 26px;
+}
+.var-sel:focus { border-color: #7c3aed; }
+.hex-wrap {
+  display: flex; align-items: center; flex-shrink: 0;
+  border: 1.5px solid #e5e7eb; border-radius: 5px;
+  padding: 3px 6px; height: 26px; transition: border-color .15s;
+}
+.hex-wrap:focus-within { border-color: #7c3aed; }
+.hash { font-size: 11px; color: #9ca3af; margin-right: 1px; }
+.hex-in {
+  width: 50px; border: none; outline: none;
+  font-size: 11px; color: #1a1a2e; font-family: monospace; background: transparent;
+}
+.hex-in:disabled { color: #9ca3af; }
+.swatch {
+  width: 22px; height: 22px; flex-shrink: 0;
+  border-radius: 4px; border: 1.5px solid #e5e7eb; cursor: pointer;
+}
+
+/* ── 고급 설정 ── */
+.adv-toggle {
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; user-select: none;
+  padding: 7px 0; border-top: 1px solid #f3f4f6;
+}
+.adv-toggle .adv-label { font-size: 11px; font-weight: 600; color: #6b7280; }
+.adv-toggle .adv-arrow { font-size: 10px; color: #9ca3af; transition: transform .2s; }
+.adv-toggle.open .adv-arrow { transform: rotate(180deg); }
+.adv-panel { display: none; }
+.adv-panel.open { display: block; }
+
+.inputs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 10px; margin-top: 8px; }
+.input-group { display: flex; flex-direction: column; gap: 3px; }
+.input-group label { font-size: 11px; color: #6b7280; }
+.input-group .row-in { display: flex; align-items: center; gap: 5px; }
+.input-group input[type=number] {
+  width: 64px; border: 1.5px solid #e5e7eb; border-radius: 5px;
+  padding: 5px 8px; font-size: 12px; outline: none; transition: border-color .15s;
+}
+.input-group input[type=number]:focus { border-color: #7c3aed; }
+
+/* ── 버튼 ── */
+button#generateBtn {
+  width: 100%; padding: 10px;
+  background: #7c3aed; color: #fff;
+  border: none; border-radius: 8px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: background .15s, opacity .15s;
+}
+button#generateBtn:hover:not(:disabled) { background: #6d28d9; }
+button#generateBtn:disabled { opacity: 0.38; cursor: not-allowed; }
+
+.status {
+  font-size: 11.5px; text-align: center; min-height: 18px;
+  padding: 5px 8px; border-radius: 5px;
+}
+.status.success { color: #059669; background: #ecfdf5; }
+.status.error   { color: #dc2626; background: #fef2f2; }
+</style>
+</head>
+<body>
+
+<div class="header">테이블 생성기</div>
+
+<div class="content">
+
+  <!-- 탭 -->
+  <div>
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tabUnified" onclick="switchTab('unified')">통합 입력</button>
+      <button class="tab-btn"        id="tabSplit"   onclick="switchTab('split')">분리 입력</button>
+      <button class="tab-btn"        id="tabHtml"    onclick="switchTab('html')">HTML</button>
+    </div>
+  </div>
+
+  <!-- 통합 입력 패널 -->
+  <div class="pane active" id="paneUnified">
+    <textarea id="pasteUnified" class="ta-unified"
+      placeholder="엑셀·구글시트에서 복사(Ctrl+C) 후 붙여넣기(Ctrl+V)&#10;탭으로 구분된 열 데이터를 자동 인식합니다."></textarea>
+    <div id="detectedUnified" class="detected idle">데이터를 붙여넣으면 행·열 수가 표시됩니다.</div>
+    <div class="toggles">
+      <label class="toggle">
+        <input type="checkbox" id="hasHeader" checked>
+        <span>첫 행 → 헤더</span>
+      </label>
+      <label class="toggle">
+        <input type="checkbox" id="hasFooter">
+        <span>마지막 행 → 푸터</span>
+      </label>
+      <label class="toggle">
+        <input type="checkbox" id="striped" checked>
+        <span>행 교대 색상</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- 분리 입력 패널 -->
+  <div class="pane" id="paneSplit">
+    <div>
+      <div class="sub-label">헤더 <span class="optional">선택</span></div>
+      <textarea id="pasteHeader" class="ta-section" placeholder="헤더 행 붙여넣기 (선택)"></textarea>
+      <div id="detectedHeader" class="detected idle">—</div>
+    </div>
+    <div>
+      <div class="sub-label">바디</div>
+      <textarea id="pasteBody" class="ta-section" placeholder="바디 데이터 붙여넣기"></textarea>
+      <div id="detectedBody" class="detected idle">데이터를 붙여넣으면 행·열 수가 표시됩니다.</div>
+    </div>
+    <div>
+      <div class="sub-label">푸터 <span class="optional">선택</span></div>
+      <textarea id="pasteFooter" class="ta-section" placeholder="푸터 행 붙여넣기 (선택)"></textarea>
+      <div id="detectedFooter" class="detected idle">—</div>
+    </div>
+    <div class="toggles">
+      <label class="toggle">
+        <input type="checkbox" id="stripedSplit" checked>
+        <span>행 교대 색상</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- HTML 입력 패널 -->
+  <div class="pane" id="paneHtml">
+    <textarea id="pasteHtml" style="height:120px"
+      placeholder="&lt;table&gt; HTML을 붙여넣으세요.&#10;thead / tbody / tfoot 태그가 있으면 헤더·바디·푸터로 자동 구분합니다.&#10;없으면 첫 행이 전부 &lt;th&gt;인 경우 헤더로 처리됩니다."></textarea>
+    <div id="detectedHtml" class="detected idle">HTML을 붙여넣으면 구조가 표시됩니다.</div>
+    <div class="toggles">
+      <label class="toggle">
+        <input type="checkbox" id="stripedHtml" checked>
+        <span>행 교대 색상</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- 테이블 너비 -->
+  <div class="tw-row">
+    <label>테이블 너비</label>
+    <input type="number" id="tableWidth" value="1400" min="200" max="4000">
+    <span class="unit">px</span>
+  </div>
+
+  <!-- 색상 설정 -->
+  <div>
+    <label class="section-label">색상 설정</label>
+    <div class="color-rows">
+
+      <div class="color-row">
+        <span class="color-label">라인색</span>
+        <select class="var-sel" id="borderVar" onchange="onVarChange('border')"><option value="">직접 입력</option></select>
+        <div class="hex-wrap"><span class="hash">#</span><input class="hex-in" type="text" id="borderHex" value="D5D5D5" maxlength="6" oninput="onHexInput('border')"></div>
+        <span class="swatch" id="borderSwatch"></span>
+      </div>
+
+      <div class="color-row">
+        <span class="color-label">헤더 배경</span>
+        <select class="var-sel" id="headerBgVar" onchange="onVarChange('headerBg')"><option value="">직접 입력</option></select>
+        <div class="hex-wrap"><span class="hash">#</span><input class="hex-in" type="text" id="headerBgHex" value="f7f7f7" maxlength="6" oninput="onHexInput('headerBg')"></div>
+        <span class="swatch" id="headerBgSwatch"></span>
+      </div>
+
+      <div class="color-row">
+        <span class="color-label">푸터 배경</span>
+        <select class="var-sel" id="footerBgVar" onchange="onVarChange('footerBg')"><option value="">직접 입력</option></select>
+        <div class="hex-wrap"><span class="hash">#</span><input class="hex-in" type="text" id="footerBgHex" value="f7f7f7" maxlength="6" oninput="onHexInput('footerBg')"></div>
+        <span class="swatch" id="footerBgSwatch"></span>
+      </div>
+
+      <div class="color-row">
+        <span class="color-label">교대 행</span>
+        <select class="var-sel" id="altBgVar" onchange="onVarChange('altBg')"><option value="">직접 입력</option></select>
+        <div class="hex-wrap"><span class="hash">#</span><input class="hex-in" type="text" id="altBgHex" value="f8fafc" maxlength="6" oninput="onHexInput('altBg')"></div>
+        <span class="swatch" id="altBgSwatch"></span>
+      </div>
+
+      <div class="color-row">
+        <span class="color-label">일반 셀</span>
+        <select class="var-sel" id="cellBgVar" onchange="onVarChange('cellBg')"><option value="">직접 입력</option></select>
+        <div class="hex-wrap"><span class="hash">#</span><input class="hex-in" type="text" id="cellBgHex" value="ffffff" maxlength="6" oninput="onHexInput('cellBg')"></div>
+        <span class="swatch" id="cellBgSwatch"></span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 고급 설정 (접힌 상태) -->
+  <div>
+    <div class="adv-toggle" id="advToggle" onclick="toggleAdv()">
+      <span class="adv-label">고급 설정</span>
+      <span class="adv-arrow">▼</span>
+    </div>
+    <div class="adv-panel" id="advPanel">
+      <div class="inputs-grid">
+        <div class="input-group">
+          <label>패딩 (상하)</label>
+          <div class="row-in">
+            <input type="number" id="paddingV" value="12" min="4" max="32">
+            <span class="unit">px</span>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>패딩 (좌우)</label>
+          <div class="row-in">
+            <input type="number" id="paddingH" value="16" min="4" max="48">
+            <span class="unit">px</span>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>최소 열 너비</label>
+          <div class="row-in">
+            <input type="number" id="minColW" placeholder="자동" min="0" max="400">
+            <span class="unit">px</span>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>폰트 크기</label>
+          <div class="row-in">
+            <input type="number" id="fontSize" value="18" min="10" max="24">
+            <span class="unit">px</span>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>최소 행 높이</label>
+          <div class="row-in">
+            <input type="number" id="minRowH" value="48" min="20" max="200">
+            <span class="unit">px</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button id="generateBtn" disabled>테이블 생성</button>
+  <div id="statusMsg" class="status"></div>
+
+</div>
+
+<script>
+  var colorVarMap = {};
+  var COLOR_KEYS  = ['border', 'headerBg', 'footerBg', 'altBg', 'cellBg'];
+  var currentTab  = 'unified';
+
+  // ── 탭 전환 ──────────────────────────────────────────────
+  function switchTab(tab) {
+    currentTab = tab;
+    ['Unified', 'Split', 'Html'].forEach(function(t) {
+      var key = t.toLowerCase();
+      document.getElementById('tab'  + t).className = 'tab-btn' + (tab === key ? ' active' : '');
+      document.getElementById('pane' + t).className = 'pane'    + (tab === key ? ' active' : '');
+    });
+    updateBtn();
+  }
+
+  // ── 고급 설정 토글 ───────────────────────────────────────
+  function toggleAdv() {
+    var isOpen = document.getElementById('advPanel').classList.contains('open');
+    document.getElementById('advPanel').className = 'adv-panel' + (isOpen ? '' : ' open');
+    document.getElementById('advToggle').className = 'adv-toggle' + (isOpen ? '' : ' open');
+  }
+
+  // ── 색상 헬퍼 ────────────────────────────────────────────
+  function updateSwatch(key) {
+    var hex = document.getElementById(key + 'Hex').value;
+    var el  = document.getElementById(key + 'Swatch');
+    el.style.background  = /^[0-9a-fA-F]{6}$/.test(hex) ? '#' + hex : '#e5e7eb';
+    el.style.borderColor = /^[0-9a-fA-F]{6}$/.test(hex) ? 'transparent' : '#e5e7eb';
+  }
+
+  function onVarChange(key) {
+    var varId = document.getElementById(key + 'Var').value;
+    var hexEl = document.getElementById(key + 'Hex');
+    if (varId && colorVarMap[varId]) {
+      hexEl.value    = colorVarMap[varId].hex.replace('#', '');
+      hexEl.disabled = true;
+    } else {
+      hexEl.disabled = false;
+    }
+    updateSwatch(key);
+  }
+
+  function onHexInput(key) {
+    document.getElementById(key + 'Var').value = '';
+    updateSwatch(key);
+  }
+
+  function getColorConfig(key) {
+    var varId  = document.getElementById(key + 'Var').value || null;
+    var rawHex = document.getElementById(key + 'Hex').value;
+    var hex    = /^[0-9a-fA-F]{6}$/.test(rawHex) ? '#' + rawHex : null;
+    return { varId: varId, hex: hex };
+  }
+
+  // ── 변수 자동 선택 ───────────────────────────────────────
+  var AUTO_DEFAULTS = [
+    { key: 'border',   matcher: function(v) { return v.name === 'Gray/20'; } },
+    { key: 'altBg',    matcher: function(v) { return v.name === 'Gray/5'; } },
+    { key: 'headerBg', matcher: function(v) { return v.name === 'Primary/5'; } },
+  ];
+
+  function populateVariables(variables) {
+    var groups = {};
+    variables.forEach(function(v) {
+      var col = v.collection || '기타';
+      if (!groups[col]) groups[col] = [];
+      groups[col].push(v);
+      colorVarMap[v.id] = v;
+    });
+
+    COLOR_KEYS.forEach(function(key) {
+      var sel = document.getElementById(key + 'Var');
+      Object.keys(groups).forEach(function(colName) {
+        var grp = document.createElement('optgroup');
+        grp.label = colName;
+        groups[colName].forEach(function(v) {
+          var opt = document.createElement('option');
+          opt.value = v.id;
+          opt.textContent = v.name;
+          grp.appendChild(opt);
+        });
+        sel.appendChild(grp);
+      });
+    });
+
+    AUTO_DEFAULTS.forEach(function(d) {
+      var found = variables.find(d.matcher);
+      if (found) {
+        document.getElementById(d.key + 'Var').value = found.id;
+        onVarChange(d.key);
+      }
+    });
+  }
+
+  // ── HTML 테이블 파서 ─────────────────────────────────────
+  function parseHTMLTable(html) {
+    if (!html.trim()) return null;
+    var parser = new DOMParser();
+    var doc    = parser.parseFromString(html, 'text/html');
+    var table  = doc.querySelector('table');
+    if (!table) return null;
+
+    function extractRows(container) {
+      return Array.from(container.querySelectorAll('tr')).map(function(row) {
+        return Array.from(row.querySelectorAll('th, td')).map(function(cell) {
+          return cell.textContent.trim();
+        });
+      }).filter(function(r) { return r.length > 0; });
+    }
+
+    var thead = table.querySelector('thead');
+    var tbody = table.querySelector('tbody');
+    var tfoot = table.querySelector('tfoot');
+
+    if (thead || tbody || tfoot) {
+      return {
+        headerRows: thead ? extractRows(thead) : [],
+        bodyRows:   tbody ? extractRows(tbody) : [],
+        footerRows: tfoot ? extractRows(tfoot) : [],
+      };
+    }
+
+    // 시맨틱 태그 없음: 첫 행이 전부 <th>이면 헤더로 처리
+    var allRows  = extractRows(table);
+    var firstTr  = table.querySelector('tr');
+    var isHeader = firstTr
+      && firstTr.querySelectorAll('th').length > 0
+      && firstTr.querySelectorAll('td').length === 0;
+    return {
+      headerRows: isHeader ? allRows.slice(0, 1) : [],
+      bodyRows:   isHeader ? allRows.slice(1)    : allRows,
+      footerRows: [],
+    };
+  }
+
+  function updateDetectedHtml() {
+    var html   = document.getElementById('pasteHtml').value;
+    var info   = document.getElementById('detectedHtml');
+    var parsed = parseHTMLTable(html);
+    if (!parsed) {
+      info.textContent = html.trim() ? '<table> 태그를 찾을 수 없습니다.' : 'HTML을 붙여넣으면 구조가 표시됩니다.';
+      info.className   = 'detected idle';
+    } else {
+      var all  = parsed.headerRows.concat(parsed.bodyRows).concat(parsed.footerRows);
+      var cols = all.reduce(function(m, r) { return Math.max(m, r.length); }, 0);
+      var parts = [];
+      if (parsed.headerRows.length) parts.push('헤더 ' + parsed.headerRows.length + '행');
+      parts.push('바디 ' + parsed.bodyRows.length + '행');
+      if (parsed.footerRows.length) parts.push('푸터 ' + parsed.footerRows.length + '행');
+      info.textContent = '✓ ' + parts.join(' · ') + ' × ' + cols + '열';
+      info.className   = 'detected ok';
+    }
+    updateBtn();
+  }
+
+  // ── TSV 파서 ─────────────────────────────────────────────
+  function parseData(raw) {
+    if (!raw.trim()) return [];
+    raw = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    var rows = [], row = [], cell = '', quoted = false, i = 0;
+    while (i < raw.length) {
+      var c = raw[i];
+      if (quoted) {
+        if (c === '"' && raw[i + 1] === '"') { cell += '"'; i += 2; }
+        else if (c === '"')                  { quoted = false; i++; }
+        else                                 { cell += c; i++; }
+      } else {
+        if      (c === '"' && cell === '')   { quoted = true; i++; }
+        else if (c === '\t')                 { row.push(cell); cell = ''; i++; }
+        else if (c === '\n')                 { row.push(cell); cell = ''; if (row.some(function(x){return x.trim();})) rows.push(row); row = []; i++; }
+        else                                 { cell += c; i++; }
+      }
+    }
+    row.push(cell);
+    if (row.some(function(x){return x.trim();})) rows.push(row);
+    return rows;
+  }
+
+  // ── 감지 정보 업데이트 ──────────────────────────────────
+  function updateDetected(taId, infoId, idleMsg) {
+    var rows = parseData(document.getElementById(taId).value);
+    var info = document.getElementById(infoId);
+    if (!rows.length) {
+      info.textContent = idleMsg || '—';
+      info.className   = 'detected idle';
+    } else {
+      var cols = rows.reduce(function(m, r) { return Math.max(m, r.length); }, 0);
+      info.textContent = '✓ ' + rows.length + '행 × ' + cols + '열';
+      info.className   = 'detected ok';
+    }
+    updateBtn();
+  }
+
+  function updateBtn() {
+    var hasData;
+    if (currentTab === 'unified') {
+      hasData = parseData(document.getElementById('pasteUnified').value).length > 0;
+    } else if (currentTab === 'split') {
+      hasData = parseData(document.getElementById('pasteBody').value).length > 0;
+    } else {
+      var p = parseHTMLTable(document.getElementById('pasteHtml').value);
+      hasData = !!p && (p.headerRows.length + p.bodyRows.length + p.footerRows.length) > 0;
+    }
+    document.getElementById('generateBtn').disabled = !hasData;
+  }
+
+  // ── 텍스트 에어리어 이벤트 바인딩 ──────────────────────
+  function bindTa(taId, infoId, idleMsg) {
+    var el = document.getElementById(taId);
+    el.addEventListener('input', function() { updateDetected(taId, infoId, idleMsg); });
+    el.addEventListener('paste', function() { setTimeout(function() { updateDetected(taId, infoId, idleMsg); }, 10); });
+  }
+  bindTa('pasteUnified', 'detectedUnified', '데이터를 붙여넣으면 행·열 수가 표시됩니다.');
+  bindTa('pasteHeader',  'detectedHeader',  '—');
+  bindTa('pasteBody',    'detectedBody',    '데이터를 붙여넣으면 행·열 수가 표시됩니다.');
+  bindTa('pasteFooter',  'detectedFooter',  '—');
+
+  var htmlTa = document.getElementById('pasteHtml');
+  htmlTa.addEventListener('input', updateDetectedHtml);
+  htmlTa.addEventListener('paste', function() { setTimeout(updateDetectedHtml, 10); });
+
+  // ── 생성 버튼 ────────────────────────────────────────────
+  document.getElementById('generateBtn').addEventListener('click', function() {
+    var btn    = document.getElementById('generateBtn');
+    var status = document.getElementById('statusMsg');
+    btn.disabled    = true;
+    btn.textContent = '생성 중...';
+    status.textContent = '';
+    status.className   = 'status';
+
+    var headerRows, bodyRows, footerRows, striped;
+
+    if (currentTab === 'unified') {
+      var allRows = parseData(document.getElementById('pasteUnified').value);
+      striped     = document.getElementById('striped').checked;
+      headerRows  = [];
+      footerRows  = [];
+      if (document.getElementById('hasHeader').checked && allRows.length > 0) {
+        headerRows = [allRows.shift()];
+      }
+      if (document.getElementById('hasFooter').checked && allRows.length > 0) {
+        footerRows = [allRows.pop()];
+      }
+      bodyRows = allRows;
+    } else if (currentTab === 'split') {
+      headerRows = parseData(document.getElementById('pasteHeader').value);
+      bodyRows   = parseData(document.getElementById('pasteBody').value);
+      footerRows = parseData(document.getElementById('pasteFooter').value);
+      striped    = document.getElementById('stripedSplit').checked;
+    } else {
+      var parsed = parseHTMLTable(document.getElementById('pasteHtml').value);
+      if (!parsed) return;
+      headerRows = parsed.headerRows;
+      bodyRows   = parsed.bodyRows;
+      footerRows = parsed.footerRows;
+      striped    = document.getElementById('stripedHtml').checked;
+    }
+
+    parent.postMessage({
+      pluginMessage: {
+        type:       'generate-table',
+        headerRows: headerRows,
+        bodyRows:   bodyRows,
+        footerRows: footerRows,
+        striped:    striped,
+        paddingV:   parseInt(document.getElementById('paddingV').value)   || 12,
+        paddingH:   parseInt(document.getElementById('paddingH').value)   || 16,
+        minColW:    parseInt(document.getElementById('minColW').value)    || 0,
+        fontSize:   parseInt(document.getElementById('fontSize').value)   || 18,
+        minRowH:    parseInt(document.getElementById('minRowH').value)    || 0,
+        tableWidth: parseInt(document.getElementById('tableWidth').value) || 0,
+        colors: {
+          border:   getColorConfig('border'),
+          headerBg: getColorConfig('headerBg'),
+          footerBg: getColorConfig('footerBg'),
+          altBg:    getColorConfig('altBg'),
+          cellBg:   getColorConfig('cellBg'),
+        },
+      }
+    }, '*');
+  });
+
+  // ── 플러그인 메시지 수신 ─────────────────────────────────
+  window.onmessage = function(event) {
+    var msg = event.data.pluginMessage;
+    if (!msg) return;
+
+    if (msg.type === 'variables') {
+      populateVariables(msg.variables || []);
+      return;
+    }
+
+    var btn    = document.getElementById('generateBtn');
+    var status = document.getElementById('statusMsg');
+    updateBtn();
+    btn.textContent = '테이블 생성';
+
+    if (msg.type === 'done') {
+      status.textContent = '✓ ' + msg.rows + '행 × ' + msg.cols + '열 테이블이 생성됐습니다.';
+      status.className   = 'status success';
+    } else if (msg.type === 'error') {
+      status.textContent = '오류: ' + msg.message;
+      status.className   = 'status error';
+    }
+  };
+
+  // ── 초기화 ───────────────────────────────────────────────
+  COLOR_KEYS.forEach(function(k) { updateSwatch(k); });
+  parent.postMessage({ pluginMessage: { type: 'ready' } }, '*');
+</script>
+
+</body>
+</html>

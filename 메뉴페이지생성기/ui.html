@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
+    background: #1e1e1e; color: #e0e0e0;
+    padding: 16px; font-size: 12px;
+  }
+
+  h2 { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 12px; }
+
+  /* URL 입력 섹션 */
+  .fetch-section { margin-bottom: 12px; }
+  .fetch-row { display: flex; gap: 6px; }
+  .fetch-row input {
+    flex: 1; padding: 8px 10px; background: #2a2a2a; border: 1px solid #444;
+    border-radius: 6px; color: #e0e0e0; font-size: 12px; outline: none;
+  }
+  .fetch-row input:focus { border-color: #18a0fb; }
+  .fetch-row input::placeholder { color: #555; }
+  .btn-fetch {
+    padding: 8px 14px; background: #2a2a2a; border: 1px solid #444;
+    border-radius: 6px; color: #ccc; font-size: 12px; font-weight: 600;
+    cursor: pointer; white-space: nowrap; transition: 0.15s;
+  }
+  .btn-fetch:hover { background: #333; border-color: #18a0fb; color: #18a0fb; }
+  .btn-fetch:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .fetch-status { margin-top: 6px; font-size: 11px; color: #888; min-height: 16px; }
+  .fetch-status.error { color: #f66; }
+  .fetch-status.success { color: #4caf50; }
+
+  /* 입력 방식 탭 */
+  .input-tabs {
+    display: flex; gap: 0; border-bottom: 1px solid #333; margin-bottom: 10px;
+  }
+  .input-tab {
+    padding: 7px 14px; background: none; border: none; border-bottom: 2px solid transparent;
+    font-size: 12px; font-weight: 600; color: #666; cursor: pointer;
+    margin-bottom: -1px; transition: color 0.15s, border-color 0.15s;
+  }
+  .input-tab:hover { color: #aaa; }
+  .input-tab.active { color: #18a0fb; border-bottom-color: #18a0fb; }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* HTML 소스 패널 */
+  .html-panel textarea {
+    width: 100%; height: 90px; padding: 8px;
+    background: #2a2a2a; border: 1px solid #444; border-radius: 6px;
+    color: #e0e0e0; font-size: 11px; resize: vertical; outline: none;
+  }
+  .html-panel textarea:focus { border-color: #18a0fb; }
+  .btn-parse {
+    margin-top: 6px; width: 100%; padding: 8px;
+    background: #333; border: none; border-radius: 6px;
+    color: #ccc; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .btn-parse:hover { background: #3a3a3a; color: #fff; }
+
+  .divider { border: none; border-top: 1px solid #333; margin: 12px 0; }
+
+  /* 메뉴 목록 */
+  .list-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 6px;
+  }
+  .list-title { font-size: 12px; font-weight: 600; color: #fff; }
+  .list-right { display: flex; align-items: center; gap: 8px; }
+  .list-count { font-size: 11px; color: #666; }
+  .btn-toggle-all {
+    font-size: 11px; color: #18a0fb; background: none; border: none;
+    cursor: pointer; padding: 0; text-decoration: underline;
+  }
+  .btn-toggle-all:hover { color: #0d8ce8; }
+
+  /* 키워드 필터 */
+  .filter-row { display: flex; gap: 6px; margin-bottom: 10px; }
+  .filter-row input {
+    flex: 1; padding: 7px 10px; background: #2a2a2a; border: 1px solid #444;
+    border-radius: 6px; color: #e0e0e0; font-size: 12px; outline: none;
+  }
+  .filter-row input:focus { border-color: #18a0fb; }
+  .filter-row input::placeholder { color: #555; }
+  .btn-filter {
+    padding: 7px 12px; background: #2a2a2a; border: 1px solid #444;
+    border-radius: 6px; color: #ccc; font-size: 12px; font-weight: 600;
+    cursor: pointer; white-space: nowrap;
+  }
+  .btn-filter:hover { border-color: #18a0fb; color: #18a0fb; }
+  .filter-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; min-height: 0; }
+  .filter-tag {
+    display: flex; align-items: center; gap: 4px;
+    padding: 2px 8px; background: #1a3a1a; border: 1px solid #2a4a2a;
+    border-radius: 12px; font-size: 11px; color: #4caf50;
+  }
+  .filter-tag .remove { cursor: pointer; color: #888; font-size: 13px; line-height: 1; }
+  .filter-tag .remove:hover { color: #f44; }
+
+  .menu-list {
+    background: #2a2a2a; border-radius: 8px;
+    padding: 10px 12px; max-height: 220px; overflow-y: auto;
+    margin-bottom: 14px;
+  }
+  .menu-list::-webkit-scrollbar { width: 4px; }
+  .menu-list::-webkit-scrollbar-track { background: #333; }
+  .menu-list::-webkit-scrollbar-thumb { background: #555; border-radius: 2px; }
+
+  .section-label {
+    font-size: 10px; font-weight: 700; color: #18a0fb;
+    padding: 8px 0 4px; letter-spacing: 0.5px;
+  }
+  .section-label:first-child { padding-top: 0; }
+
+  /* 체크박스 포함 메뉴 아이템 */
+  label.menu-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 0; border-bottom: 1px solid #333;
+    cursor: pointer; user-select: none;
+  }
+  label.menu-item:last-child { border-bottom: none; }
+  label.menu-item input[type="checkbox"] {
+    accent-color: #18a0fb; width: 13px; height: 13px;
+    cursor: pointer; flex-shrink: 0;
+  }
+  .menu-name { font-weight: 600; color: #fff; flex: 1; }
+  .menu-path { font-size: 10px; color: #555; flex-shrink: 0; }
+
+  /* 제외된 항목 */
+  label.menu-item.excluded .menu-name { text-decoration: line-through; color: #444; }
+  label.menu-item.excluded .menu-path { color: #333; }
+
+  /* 버튼 */
+  .btn-row { display: flex; gap: 8px; }
+  button.primary {
+    flex: 1; padding: 10px; border: none; border-radius: 6px;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    background: #18a0fb; color: #fff; transition: 0.15s;
+  }
+  button.primary:hover:not(:disabled) { background: #0d8ce8; }
+  button.primary:disabled { background: #333; color: #555; cursor: not-allowed; }
+  button.secondary {
+    flex: 1; padding: 10px; border: none; border-radius: 6px;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    background: #2a2a2a; color: #aaa; transition: 0.15s;
+  }
+  button.secondary:hover { background: #333; }
+
+  .progress-wrap { margin-top: 14px; display: none; }
+  progress {
+    -webkit-appearance: none; width: 100%; height: 6px;
+    border-radius: 3px; border: none; background: #333;
+  }
+  progress::-webkit-progress-bar { background: #333; border-radius: 3px; }
+  progress::-webkit-progress-value { background: #18a0fb; border-radius: 3px; transition: width 0.2s; }
+  .progress-label { font-size: 11px; color: #666; margin-top: 6px; text-align: center; }
+
+  .result {
+    margin-top: 12px; padding: 10px 12px; border-radius: 6px;
+    font-size: 12px; text-align: center; display: none; font-weight: 600;
+  }
+  .result.success { background: #162516; color: #4caf50; border: 1px solid #2a4a2a; }
+  .result.error { background: #2a1616; color: #f44336; border: 1px solid #4a2a2a; white-space: pre-line; }
+
+  /* 엑셀(CSV) 섹션 */
+  .excel-toggle { font-size: 11px; color: #18a0fb; cursor: pointer; display: block; margin-top: 6px; text-decoration: underline; }
+  .excel-toggle:hover { color: #0d8ce8; }
+  .excel-section { display: none; margin-top: 8px; padding: 10px; background: #242424; border-radius: 6px; }
+  .excel-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .file-label-excel { padding: 6px 12px; background: #2a2a2a; border: 1px solid #444; border-radius: 6px; font-size: 11px; color: #ccc; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+  .file-label-excel:hover { border-color: #18a0fb; color: #18a0fb; }
+  .csv-filename { font-size: 11px; color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mapping-area { display: none; }
+  .mapping-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .mapping-label { font-size: 11px; color: #888; width: 72px; flex-shrink: 0; }
+  .col-select { flex: 1; padding: 5px 8px; background: #2a2a2a; border: 1px solid #444; border-radius: 4px; color: #e0e0e0; font-size: 11px; outline: none; }
+  .col-select:focus { border-color: #18a0fb; }
+  .cat-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .cat-chip { display: flex; align-items: center; gap: 4px; }
+  .cat-chip input[type="checkbox"] { accent-color: #18a0fb; }
+  .cat-chip label { font-size: 11px; color: #ccc; cursor: pointer; }
+  .btn-apply-csv { width: 100%; margin-top: 8px; padding: 8px; background: #18a0fb; border: none; border-radius: 6px; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .btn-apply-csv:hover { background: #0d8ce8; }
+  .csv-hint { font-size: 10px; color: #555; margin-top: 6px; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<h2>메뉴 페이지 생성기</h2>
+
+<!-- URL / HTML 소스 입력 -->
+<div class="fetch-section">
+  <div class="input-tabs">
+    <button class="input-tab active" id="tabUrl">URL 입력</button>
+    <button class="input-tab" id="tabHtml">HTML 소스</button>
+  </div>
+
+  <!-- URL 패널 -->
+  <div class="tab-panel active" id="panelUrl">
+    <div class="fetch-row">
+      <input type="text" id="urlInput" placeholder="https://example.com" />
+      <button class="btn-fetch" id="fetchBtn">메뉴 추출</button>
+    </div>
+    <div class="fetch-status" id="fetchStatus"></div>
+  </div>
+
+  <!-- HTML 소스 패널 -->
+  <div class="tab-panel html-panel" id="panelHtml">
+    <textarea id="htmlInput" placeholder="브라우저 소스 보기(Ctrl+U) → 전체 복사(Ctrl+A, Ctrl+C) → 여기에 붙여넣기(Ctrl+V)"></textarea>
+    <button class="btn-parse" id="parseBtn">HTML 분석하기</button>
+    <div class="fetch-status" id="htmlStatus"></div>
+  </div>
+
+  <!-- 엑셀(CSV) 입력 -->
+  <div class="excel-toggle" id="excelToggle">▶ 엑셀(CSV) 파일에서 불러오기</div>
+  <div class="excel-section" id="excelSection">
+    <div class="csv-hint">엑셀 → 파일 → 다른 이름으로 저장 → <strong style="color:#ccc">CSV UTF-8(쉼표로 분리)(.csv)</strong> 선택 후 업로드</div>
+    <div class="excel-row" style="margin-top:8px">
+      <label class="file-label-excel">
+        CSV 파일 선택
+        <input type="file" accept=".csv,.txt" id="csvFileInput" style="display:none">
+      </label>
+      <span class="csv-filename" id="csvFileName">선택된 파일 없음</span>
+    </div>
+    <div class="mapping-row" style="margin-bottom:8px">
+      <span class="mapping-label">인코딩</span>
+      <select class="col-select" id="encodingSelect">
+        <option value="UTF-8">UTF-8 (권장)</option>
+        <option value="EUC-KR">EUC-KR (글자 깨질 때)</option>
+        <option value="CP949">CP949 (한글 Windows 기본)</option>
+      </select>
+    </div>
+    <div class="mapping-area" id="mappingArea">
+      <div class="mapping-row">
+        <span class="mapping-label">메뉴명 열</span>
+        <select class="col-select" id="nameColSelect"></select>
+      </div>
+      <div class="mapping-row">
+        <span class="mapping-label">경로 구성</span>
+        <select class="col-select" id="pathModeSelect">
+          <option value="levels">단계별 열 자동 조합 (1차, 2차, 3차…)</option>
+          <option value="single">단일 경로 열 사용</option>
+          <option value="nameonly">메뉴명만 사용</option>
+        </select>
+      </div>
+      <div class="mapping-row" id="pathColRow" style="display:none">
+        <span class="mapping-label">경로 열</span>
+        <select class="col-select" id="pathColSelect"></select>
+      </div>
+      <div class="mapping-row">
+        <span class="mapping-label">분류 열</span>
+        <select class="col-select" id="categoryColSelect"></select>
+      </div>
+      <div class="mapping-row" id="catValueRow">
+        <span class="mapping-label">포함할 분류</span>
+        <div class="cat-chips" id="catChips"></div>
+      </div>
+      <button class="btn-apply-csv" id="applyCSVBtn">이 메뉴 데이터 적용하기</button>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- 키워드 필터 -->
+<div class="filter-row">
+  <input type="text" id="filterInput" placeholder="제외할 키워드 입력 (예: 게시판, 공지사항)" />
+  <button class="btn-filter" id="filterAddBtn">추가</button>
+</div>
+<div class="filter-tags" id="filterTags"></div>
+
+<!-- 메뉴 목록 -->
+<div class="list-header">
+  <span class="list-title">메뉴 목록</span>
+  <div class="list-right">
+    <button class="btn-toggle-all" onclick="toggleAll(true)">전체 선택</button>
+    <button class="btn-toggle-all" onclick="toggleAll(false)">전체 해제</button>
+    <span class="list-count" id="listCount">총 0개</span>
+  </div>
+</div>
+<div class="menu-list" id="menuList">
+  <div style="color:#555;text-align:center;padding:20px 0;">URL을 입력하고 메뉴를 추출하세요</div>
+</div>
+
+<!-- 생성 버튼 -->
+<div class="btn-row">
+  <button class="primary" id="generateBtn" disabled>생성 시작</button>
+  <button class="secondary" id="cancelBtn">닫기</button>
+</div>
+
+<div class="progress-wrap" id="progressWrap">
+  <progress id="progressBar" value="0" max="100"></progress>
+  <div class="progress-label" id="progressLabel">준비 중...</div>
+</div>
+<div class="result" id="result"></div>
+
+<script>
+  const DEFAULT_MENU = [
+    { name: "인사말",            path: "공제회 소개 > 인사말" },
+    { name: "연혁",              path: "공제회 소개 > 연혁" },
+    { name: "기관소개",          path: "공제회 소개 > 기관소개" },
+    { name: "조직도",            path: "공제회 소개 > 조직도" },
+    { name: "오시는 길",         path: "공제회 소개 > 오시는 길" },
+    { name: "시도공제회 연락처", path: "공제회 소개 > 시도공제회 연락처" },
+    { name: "공제급여",          path: "보상업무 > 공제급여" },
+    { name: "학교폭력",          path: "보상업무 > 학교폭력" },
+    { name: "상담지원",          path: "보상업무 > 상담지원" },
+    { name: "교원보호공제",      path: "보상업무 > 교원보호공제" },
+    { name: "여행자공제",        path: "보상업무 > 여행자공제" },
+    { name: "소방점검",          path: "학교소방사업 > 소방점검" },
+    { name: "소방공사업",        path: "학교소방사업 > 소방공사업" },
+    { name: "예방사업 소개",     path: "예방사업 > 예방사업 소개" },
+    { name: "예방자료",          path: "예방사업 > 예방자료" },
+    { name: "신청하기",          path: "예방사업 > 신청하기" },
+    { name: "공지사항",          path: "알림마당 > 공지사항" },
+    { name: "자주하는 질문",     path: "알림마당 > 자주하는 질문" },
+    { name: "인사채용",          path: "알림마당 > 인사채용" },
+    { name: "보상업무",          path: "자료실 > 보상업무" },
+    { name: "소방업무",          path: "자료실 > 소방업무" },
+  ];
+
+  let currentMenuData = [];
+  let excludeKeywords = [];
+
+  window.onmessage = (event) => {
+    const msg = event.data.pluginMessage;
+    if (!msg) return;
+    if (msg.type === 'progress') {
+      const pct = Math.round((msg.current / msg.total) * 100);
+      document.getElementById('progressBar').value = pct;
+      document.getElementById('progressLabel').textContent = `${msg.current} / ${msg.total} 처리 중...`;
+    } else if (msg.type === 'done') {
+      document.getElementById('generateBtn').disabled = false;
+      document.getElementById('progressWrap').style.display = 'none';
+      showResult(`✅ ${msg.count}개 페이지가 생성되었습니다!`, 'success');
+    } else if (msg.type === 'error') {
+      document.getElementById('generateBtn').disabled = false;
+      document.getElementById('progressWrap').style.display = 'none';
+      showResult('❌ ' + msg.message, 'error');
+    }
+  };
+
+  // 키워드 필터: 키워드가 포함된 메뉴는 자동 체크 해제
+  function isExcluded(menuItem) {
+    if (excludeKeywords.length === 0) return false;
+    const target = (menuItem.name + ' ' + menuItem.path).toLowerCase();
+    return excludeKeywords.some(kw => target.includes(kw.toLowerCase()));
+  }
+
+  function renderFilterTags() {
+    document.getElementById('filterTags').innerHTML = excludeKeywords.map((kw, i) =>
+      `<span class="filter-tag">${kw}<span class="remove" onclick="removeKeyword(${i})">×</span></span>`
+    ).join('');
+  }
+
+  function addKeyword() {
+    const input = document.getElementById('filterInput');
+    const kw = input.value.trim();
+    if (!kw || excludeKeywords.includes(kw)) { input.value = ''; return; }
+    excludeKeywords.push(kw);
+    input.value = '';
+    renderFilterTags();
+    applyKeywordFilter(); // 목록에 즉시 반영
+  }
+
+  function removeKeyword(idx) {
+    excludeKeywords.splice(idx, 1);
+    renderFilterTags();
+    applyKeywordFilter();
+  }
+
+  // 현재 목록에 키워드 필터 적용 (체크박스 on/off)
+  function applyKeywordFilter() {
+    document.querySelectorAll('.item-check').forEach(cb => {
+      const idx = parseInt(cb.dataset.index);
+      const item = currentMenuData[idx];
+      if (item && isExcluded(item)) cb.checked = false;
+      else if (item) cb.checked = true;
+    });
+    updateCount();
+  }
+
+  // 체크된 메뉴만 반환
+  function getCheckedMenuData() {
+    return [...document.querySelectorAll('.item-check')]
+      .filter(cb => cb.checked)
+      .map(cb => currentMenuData[parseInt(cb.dataset.index)]);
+  }
+
+  // 선택 카운트 및 스타일 업데이트
+  function updateCount() {
+    const all = [...document.querySelectorAll('.item-check')];
+    const checkedCount = all.filter(cb => cb.checked).length;
+    document.getElementById('listCount').textContent =
+      `${all.length}개 중 ${checkedCount}개 선택`;
+    document.getElementById('generateBtn').disabled = checkedCount === 0;
+    // 제외 항목 흐리게
+    document.querySelectorAll('label.menu-item').forEach(item => {
+      const cb = item.querySelector('.item-check');
+      if (cb) item.classList.toggle('excluded', !cb.checked);
+    });
+  }
+
+  // 전체 선택 / 전체 해제
+  function toggleAll(checked) {
+    document.querySelectorAll('.item-check').forEach(cb => { cb.checked = checked; });
+    updateCount();
+  }
+
+  function parseMenuFromHTML(html) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const menuData = [];
+
+    // 숨김 텍스트·아이콘 제거 후 링크 텍스트 추출
+    function getLinkText(el) {
+      const clone = el.cloneNode(true);
+      clone.querySelectorAll('.blind, .sr-only, .hidden, .ico, .icon, img, em').forEach(e => e.remove());
+      return clone.textContent.trim().replace(/\s+/g, ' ');
+    }
+
+    // li 내 대표 앵커 탐색 (직계 → span/strong/div 한 단계 안)
+    function getAnchor(li) {
+      return li.querySelector(':scope > a')
+        || li.querySelector(':scope > strong > a')
+        || li.querySelector(':scope > span > a')
+        || li.querySelector(':scope > div > a')
+        || li.querySelector(':scope > p > a');
+    }
+
+    // li 내 서브메뉴 ul 탐색
+    // 직계 ul → 직계 div·section 내 ul → 그 아래 div 한 단계 더
+    function findSubUl(li) {
+      const direct = li.querySelector(':scope > ul');
+      if (direct && direct.querySelectorAll(':scope > li').length > 0) return direct;
+      for (const child of li.children) {
+        if (/^(DIV|SECTION|ARTICLE|NAV)$/.test(child.tagName)) {
+          const ul = child.querySelector(':scope > ul') || child.querySelector('ul');
+          if (ul && ul.querySelectorAll('li').length > 0) return ul;
+        }
+      }
+      return null;
+    }
+
+    // navRoot 탐색 — 더 넓은 선택자 목록
+    const selectors = [
+      '#gnb', '.gnb', '#gnb-wrap', '.gnb-wrap', '#gnbWrap', '.gnbWrap',
+      '#nav', '.nav', '#topnav', '.topnav', '#top-nav', '.top-nav',
+      '#header-nav', '.header-nav', '#lnb', '.lnb',
+      '#navigation', '.navigation', '#main-nav', '.main-nav',
+      '#menu', '.menu', 'header nav', 'nav',
+    ];
+    let navRoot = null;
+    for (const sel of selectors) {
+      const el = doc.querySelector(sel);
+      if (el && el.querySelectorAll('li').length >= 3) { navRoot = el; break; }
+    }
+    if (!navRoot) {
+      // 가장 많은 li를 포함하는 ul (200개 미만으로 한정 — 사이트맵 제외)
+      let best = null, bestCount = 0;
+      doc.querySelectorAll('ul').forEach(ul => {
+        const cnt = ul.querySelectorAll('li').length;
+        if (cnt > bestCount && cnt < 200) { bestCount = cnt; best = ul; }
+      });
+      navRoot = best;
+    }
+    if (!navRoot) return null;
+
+    function extractItems(ul, pathParts) {
+      ul.querySelectorAll(':scope > li').forEach(li => {
+        const a = getAnchor(li);
+        if (!a) return;
+        const name = getLinkText(a);
+        if (!name || name.length > 50) return;
+        const newPath = [...pathParts, name];
+        const subUl = findSubUl(li);
+        if (subUl) {
+          extractItems(subUl, newPath);
+        } else {
+          menuData.push({ name, path: newPath.join(' > ') });
+        }
+      });
+    }
+
+    const topUl = navRoot.tagName === 'UL' ? navRoot : navRoot.querySelector('ul');
+    if (topUl) extractItems(topUl, []);
+    return menuData.length > 0 ? menuData : null;
+  }
+
+  function setStatus(msg, type = '') {
+    const el = document.getElementById('fetchStatus');
+    el.textContent = msg;
+    el.className = 'fetch-status ' + type;
+  }
+
+  function applyMenuData(data) {
+    currentMenuData = data;
+    renderMenuList(data);
+    applyKeywordFilter(); // 메뉴 로드 시 기존 키워드 즉시 적용
+  }
+
+  function renderMenuList(menuData) {
+    const sectionMap = {};
+    menuData.forEach((m, idx) => {
+      const sec = m.path.split(' > ')[0];
+      if (!sectionMap[sec]) sectionMap[sec] = [];
+      sectionMap[sec].push({ ...m, originalIndex: idx });
+    });
+
+    let html = '';
+    for (const [sec, items] of Object.entries(sectionMap)) {
+      html += `<div class="section-label">${sec}</div>`;
+      items.forEach(m => {
+        html += `
+          <label class="menu-item">
+            <input type="checkbox" class="item-check" data-index="${m.originalIndex}" checked onchange="updateCount()">
+            <span class="menu-name">${m.name}</span>
+            <span class="menu-path">${m.path}</span>
+          </label>`;
+      });
+    }
+    document.getElementById('menuList').innerHTML =
+      html || '<div style="color:#555;text-align:center;padding:20px 0;">추출된 메뉴가 없습니다</div>';
+  }
+
+  function showResult(msg, type) {
+    const el = document.getElementById('result');
+    el.textContent = msg;
+    el.className = 'result ' + type;
+    el.style.display = 'block';
+  }
+
+  /* ═══════════════════════════════════
+     엑셀(CSV) 파싱
+  ═══════════════════════════════════ */
+  let csvData = null;
+  let levelCols = [];
+
+  function parseCSVRow(line) {
+    const result = []; let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else { inQ = !inQ; } }
+      else if (c === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
+      else { cur += c; }
+    }
+    result.push(cur.trim()); return result;
+  }
+
+  function parseCSV(text) {
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1); // BOM 제거
+    const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(l => l.trim());
+    if (lines.length < 2) return null;
+    const headers = parseCSVRow(lines[0]);
+    const rows = lines.slice(1).map(l => {
+      const vals = parseCSVRow(l);
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = (vals[i] || '').trim(); });
+      return obj;
+    }).filter(r => Object.values(r).some(v => v));
+    return { headers, rows };
+  }
+
+  function detectCol(headers, patterns) {
+    return headers.find(h => patterns.some(p => h.toLowerCase().includes(p.toLowerCase()))) || '';
+  }
+
+  function detectLevelCols(headers) {
+    const cols = [];
+    for (let n = 1; n <= 5; n++) {
+      const col = headers.find(h => h.includes(`${n}차`) || h.toLowerCase() === `level${n}` || h === `${n}단계`);
+      if (col) cols.push(col);
+    }
+    return cols;
+  }
+
+  function fillSelectOptions(id, headers, includeNone = false) {
+    const sel = document.getElementById(id);
+    sel.innerHTML = (includeNone ? '<option value="">-- 없음 --</option>' : '')
+      + headers.map(h => `<option value="${h}">${h}</option>`).join('');
+  }
+
+  function renderCatChips(rows, categoryCol) {
+    const el = document.getElementById('catChips');
+    if (!categoryCol) { el.innerHTML = '<span style="font-size:11px;color:#555">분류 열 없음</span>'; return; }
+    const values = [...new Set(rows.map(r => r[categoryCol]).filter(v => v))].sort();
+    const defaultOn = ['콘텐츠', '컨텐츠', 'content'];
+    el.innerHTML = values.map(v => {
+      const count = rows.filter(r => r[categoryCol] === v).length;
+      const checked = defaultOn.some(d => v.toLowerCase().includes(d)) ? 'checked' : '';
+      return `<div class="cat-chip">
+        <input type="checkbox" id="cat_${v}" value="${v}" ${checked}>
+        <label for="cat_${v}">${v} (${count})</label>
+      </div>`;
+    }).join('');
+  }
+
+  function updatePathMode() {
+    document.getElementById('pathColRow').style.display =
+      document.getElementById('pathModeSelect').value === 'single' ? 'flex' : 'none';
+  }
+
+  // 병합 셀(Fill Down) 처리:
+  // 상위 단계 열에 새 값이 생기면 하위 단계의 이월값을 초기화하고,
+  // 빈 셀은 위 행의 값으로 채움
+  function fillDownLevelCols(rows, cols) {
+    const lastVals = {};
+    cols.forEach(c => lastVals[c] = '');
+
+    return rows.map(row => {
+      const newRow = { ...row };
+
+      // 현재 행에서 값이 있는 열 중 가장 상위(인덱스 낮은) 단계 찾기
+      let lowestIdx = cols.length;
+      cols.forEach((c, i) => {
+        if (row[c] && row[c].trim() && i < lowestIdx) lowestIdx = i;
+      });
+
+      // 그 단계보다 하위 단계 중 현재 행이 비어있으면 이월값 초기화
+      if (lowestIdx < cols.length) {
+        for (let i = lowestIdx + 1; i < cols.length; i++) {
+          if (!row[cols[i]] || !row[cols[i]].trim()) lastVals[cols[i]] = '';
+        }
+      }
+
+      // Fill Down 적용
+      cols.forEach(c => {
+        if (row[c] && row[c].trim()) {
+          lastVals[c] = row[c];
+          newRow[c] = row[c];
+        } else {
+          newRow[c] = lastVals[c];
+        }
+      });
+
+      return newRow;
+    });
+  }
+
+  function buildMenuFromCSV() {
+    if (!csvData) return [];
+    const nameCol      = document.getElementById('nameColSelect').value;
+    const categoryCol  = document.getElementById('categoryColSelect').value;
+    const pathMode     = document.getElementById('pathModeSelect').value;
+    const pathCol      = document.getElementById('pathColSelect').value;
+    const selectedCats = [...document.querySelectorAll('#catChips input:checked')].map(cb => cb.value);
+
+    let rows = csvData.rows;
+
+    // 단계별 모드: Fill Down으로 병합 셀 복원 후 필터링
+    if (pathMode === 'levels' && levelCols.length > 0) {
+      rows = fillDownLevelCols(rows, levelCols);
+    }
+
+    if (categoryCol && selectedCats.length > 0) {
+      rows = rows.filter(r => selectedCats.includes(r[categoryCol]));
+    }
+
+    return rows.map(row => {
+      let name, path;
+
+      if (pathMode === 'levels' && levelCols.length > 0) {
+        // 비어있지 않은 단계 열만 추출
+        const filled = levelCols.map(c => row[c]).filter(v => v && v.trim());
+        if (filled.length === 0) return null;
+        name = filled[filled.length - 1]; // 마지막 단계값 = 현재 페이지명
+        path = filled.join(' > ');
+      } else if (pathMode === 'single' && pathCol && row[pathCol]) {
+        name = row[nameCol] || '';
+        path = row[pathCol];
+      } else {
+        name = row[nameCol] || '';
+        path = name;
+      }
+
+      if (!name) return null;
+      return { name, path };
+    }).filter(Boolean);
+  }
+
+  function loadCSVFile(file) {
+    const encoding = document.getElementById('encodingSelect').value;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      csvData = parseCSV(ev.target.result);
+      if (!csvData) {
+        alert('CSV 파일을 읽을 수 없습니다.\n글자가 깨지면 인코딩을 변경해 다시 시도해 주세요.');
+        return;
+      }
+      levelCols = detectLevelCols(csvData.headers);
+      fillSelectOptions('nameColSelect', csvData.headers);
+      fillSelectOptions('pathColSelect', csvData.headers, true);
+      fillSelectOptions('categoryColSelect', csvData.headers, true);
+      document.getElementById('nameColSelect').value = detectCol(csvData.headers, ['메뉴명','메뉴','페이지명','페이지','name','menu']);
+      document.getElementById('categoryColSelect').value = detectCol(csvData.headers, ['분류','유형','타입','구분','type','category']);
+      renderCatChips(csvData.rows, document.getElementById('categoryColSelect').value);
+      document.getElementById('mappingArea').style.display = 'block';
+    };
+    reader.readAsText(file, encoding);
+  }
+
+  // CSV 파일 선택
+  document.getElementById('csvFileInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    document.getElementById('csvFileName').textContent = file.name;
+    loadCSVFile(file);
+  });
+
+  // 인코딩 변경 시 같은 파일 다시 읽기
+  document.getElementById('encodingSelect').addEventListener('change', () => {
+    const input = document.getElementById('csvFileInput');
+    if (input.files[0]) loadCSVFile(input.files[0]);
+  });
+
+  document.getElementById('categoryColSelect').addEventListener('change', () => {
+    if (csvData) renderCatChips(csvData.rows, document.getElementById('categoryColSelect').value);
+  });
+  document.getElementById('pathModeSelect').addEventListener('change', updatePathMode);
+
+  document.getElementById('applyCSVBtn').addEventListener('click', () => {
+    const menuData = buildMenuFromCSV();
+    if (menuData.length === 0) { alert('선택한 분류에 해당하는 메뉴가 없습니다.'); return; }
+    applyMenuData(menuData);
+    setStatus(`✅ CSV에서 ${menuData.length}개 메뉴 로드 완료`, 'success');
+    document.getElementById('excelSection').style.display = 'none';
+    document.getElementById('excelToggle').textContent = '▶ 엑셀(CSV) 파일에서 불러오기';
+  });
+
+  document.getElementById('excelToggle').addEventListener('click', () => {
+    const sec = document.getElementById('excelSection');
+    const isOpen = sec.style.display !== 'none';
+    sec.style.display = isOpen ? 'none' : 'block';
+    document.getElementById('excelToggle').textContent =
+      isOpen ? '▶ 엑셀(CSV) 파일에서 불러오기' : '▼ 엑셀(CSV) 파일에서 불러오기';
+  });
+
+  // 키워드 필터 이벤트
+  document.getElementById('filterAddBtn').addEventListener('click', addKeyword);
+  document.getElementById('filterInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addKeyword();
+  });
+
+  // 탭 전환
+  function switchTab(tab) {
+    document.getElementById('tabUrl').classList.toggle('active', tab === 'url');
+    document.getElementById('tabHtml').classList.toggle('active', tab === 'html');
+    document.getElementById('panelUrl').classList.toggle('active', tab === 'url');
+    document.getElementById('panelHtml').classList.toggle('active', tab === 'html');
+  }
+  document.getElementById('tabUrl').addEventListener('click', () => switchTab('url'));
+  document.getElementById('tabHtml').addEventListener('click', () => switchTab('html'));
+
+  function setHtmlStatus(msg, type = '') {
+    const el = document.getElementById('htmlStatus');
+    el.textContent = msg;
+    el.className = 'fetch-status ' + type;
+  }
+
+  // URL fetch
+  document.getElementById('fetchBtn').addEventListener('click', async () => {
+    const url = document.getElementById('urlInput').value.trim();
+    if (!url) return;
+    const btn = document.getElementById('fetchBtn');
+    btn.disabled = true;
+    setStatus('불러오는 중...');
+    try {
+      const res = await fetch(url);
+      const html = await res.text();
+      const parsed = parseMenuFromHTML(html);
+      if (parsed && parsed.length > 0) {
+        applyMenuData(parsed);
+        setStatus(`✅ ${parsed.length}개 메뉴 추출 완료`, 'success');
+      } else {
+        setStatus('메뉴 구조를 찾지 못했습니다. HTML 소스 탭을 시도해보세요.', 'error');
+        switchTab('html');
+      }
+    } catch (e) {
+      setStatus('CORS 차단 → HTML 소스 탭을 사용하세요.', 'error');
+      switchTab('html');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // HTML 소스 분석
+  document.getElementById('parseBtn').addEventListener('click', () => {
+    const html = document.getElementById('htmlInput').value.trim();
+    if (!html) { setHtmlStatus('HTML을 붙여넣어 주세요.', 'error'); return; }
+    const parsed = parseMenuFromHTML(html);
+    if (parsed && parsed.length > 0) {
+      applyMenuData(parsed);
+      setHtmlStatus(`✅ ${parsed.length}개 메뉴 추출 완료`, 'success');
+    } else {
+      setHtmlStatus('메뉴 구조를 찾지 못했습니다. 기본 데이터를 사용합니다.', 'error');
+      applyMenuData(DEFAULT_MENU);
+    }
+  });
+
+  // 생성 시작 — 체크된 항목만 전송
+  document.getElementById('generateBtn').addEventListener('click', () => {
+    const selectedMenu = getCheckedMenuData();
+    if (selectedMenu.length === 0) return;
+    document.getElementById('generateBtn').disabled = true;
+    document.getElementById('result').style.display = 'none';
+    document.getElementById('progressWrap').style.display = 'block';
+    document.getElementById('progressBar').value = 0;
+    document.getElementById('progressLabel').textContent = '시작 중...';
+    parent.postMessage({ pluginMessage: { type: 'generate', menuData: selectedMenu } }, '*');
+  });
+
+  document.getElementById('cancelBtn').addEventListener('click', () => {
+    parent.postMessage({ pluginMessage: { type: 'cancel' } }, '*');
+  });
+</script>
+</body>
+</html>

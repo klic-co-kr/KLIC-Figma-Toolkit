@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Pretendard', 'Noto Sans KR', sans-serif; background: #1e1e1e; color: #e0e0e0; font-size: 12px; }
+  .wrap { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+
+  h2 { font-size: 14px; font-weight: 700; color: #fff; }
+  .desc { font-size: 11px; color: #666; }
+
+  /* 입력 섹션 */
+  .input-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .input-title { font-size: 12px; font-weight: 600; color: #ccc; }
+  .file-label { padding: 4px 10px; background: #2a2a2a; border: 1px solid #444; border-radius: 4px; font-size: 11px; color: #aaa; cursor: pointer; }
+  .file-label:hover { border-color: #18a0fb; color: #18a0fb; }
+  textarea {
+    width: 100%; height: 100px; padding: 8px; background: #2a2a2a;
+    border: 1px solid #444; border-radius: 6px; color: #e0e0e0; font-size: 11px;
+    resize: vertical; outline: none; line-height: 1.5;
+  }
+  textarea:focus { border-color: #18a0fb; }
+  textarea::placeholder { color: #555; }
+
+  /* 버튼 */
+  .btn-parse { width: 100%; padding: 9px; background: #2a2a2a; border: 1px solid #444; border-radius: 6px; color: #ccc; font-size: 12px; font-weight: 600; cursor: pointer; margin-top: 6px; }
+  .btn-parse:hover { background: #333; border-color: #18a0fb; color: #18a0fb; }
+  .btn-row { display: flex; gap: 8px; }
+  .btn-primary { flex: 1; padding: 10px; background: #18a0fb; border: none; border-radius: 6px; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .btn-primary:hover:not(:disabled) { background: #0d8ce8; }
+  .btn-primary:disabled { background: #333; color: #555; cursor: not-allowed; }
+  .btn-secondary { flex: 1; padding: 10px; background: #2a2a2a; border: none; border-radius: 6px; color: #aaa; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .btn-secondary:hover { background: #333; }
+  .btn-draw { flex: 1; padding: 10px; background: #0f3a2a; border: 1px solid #1a6b4a; border-radius: 6px; color: #3dd68c; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .btn-draw:hover:not(:disabled) { background: #1a5e3a; border-color: #3dd68c; }
+  .btn-draw:disabled { background: #1e2a24; color: #3a6a50; border-color: #2a4a38; cursor: not-allowed; }
+  .btn-comp { flex: 1; padding: 10px; background: #1e1a3a; border: 1px solid #4a3a7a; border-radius: 6px; color: #a78bfa; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .btn-comp:hover:not(:disabled) { background: #2a2050; border-color: #a78bfa; }
+  .btn-comp:disabled { background: #1a1a2a; color: #4a4a6a; border-color: #2a2a4a; cursor: not-allowed; }
+
+  /* 미리보기 */
+  .preview { background: #242424; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+  .preview-block {}
+  .preview-label { font-size: 10px; font-weight: 700; color: #18a0fb; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .color-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .color-name { font-size: 11px; color: #aaa; width: 64px; flex-shrink: 0; }
+  .swatches { display: flex; gap: 2px; }
+  .swatch {
+    width: 18px; height: 18px; border-radius: 3px; cursor: default;
+    position: relative;
+  }
+  .swatch:hover::after {
+    content: attr(data-tip);
+    position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
+    background: #000; color: #fff; padding: 2px 5px; border-radius: 3px;
+    font-size: 10px; white-space: nowrap; z-index: 10; pointer-events: none;
+  }
+  .swatch.base-mark { outline: 2px solid #fff; outline-offset: 1px; }
+
+  .semantic-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .semantic-name { font-size: 11px; color: #aaa; width: 64px; flex-shrink: 0; }
+  .semantic-chips { display: flex; gap: 4px; }
+  .semantic-chip { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .semantic-swatch { width: 36px; height: 20px; border-radius: 4px; }
+  .semantic-chip-label { font-size: 9px; color: #666; }
+
+  .value-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { padding: 3px 7px; background: #333; border-radius: 4px; font-size: 10px; color: #aaa; }
+
+  .summary { font-size: 11px; color: #888; text-align: center; padding: 4px 0; }
+
+  /* 진행 */
+  .progress-wrap { }
+  progress { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; border: none; background: #333; }
+  progress::-webkit-progress-bar { background: #333; border-radius: 3px; }
+  progress::-webkit-progress-value { background: #18a0fb; border-radius: 3px; transition: width 0.15s; }
+  .progress-name { font-size: 10px; color: #555; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .result { padding: 10px; border-radius: 6px; font-size: 12px; font-weight: 600; text-align: center; }
+  .result.success { background: #162516; color: #4caf50; border: 1px solid #2a4a2a; }
+  .result.error   { background: #2a1616; color: #f44336; border: 1px solid #4a2a2a; white-space: pre-line; }
+
+  .auto-preview-info { display: flex; flex-direction: column; gap: 4px; }
+  .auto-preview-row { font-size: 10px; color: #666; line-height: 1.5; }
+
+  /* 폰트 선택 */
+  .font-search-row { display: flex; gap: 6px; margin-top: 4px; }
+  .font-input { flex: 1; padding: 7px 10px; background: #2a2a2a; border: 1px solid #444; border-radius: 6px; color: #e0e0e0; font-size: 12px; outline: none; }
+  .font-input:focus { border-color: #18a0fb; }
+  .btn-font-search { padding: 7px 12px; background: #2a2a2a; border: 1px solid #444; border-radius: 6px; color: #aaa; font-size: 11px; cursor: pointer; white-space: nowrap; }
+  .btn-font-search:hover { border-color: #18a0fb; color: #18a0fb; }
+  .font-results { display: flex; flex-direction: column; gap: 2px; max-height: 108px; overflow-y: auto; margin-top: 4px; }
+  .font-result-item { padding: 5px 8px; background: #2a2a2a; border-radius: 4px; font-size: 11px; color: #aaa; cursor: pointer; border: 1px solid transparent; }
+  .font-result-item:hover { background: #333; color: #fff; }
+  .font-result-item.active { background: #0f2a4a; color: #18a0fb; border-color: #18a0fb; }
+  .font-selected-label { font-size: 10px; color: #3dd68c; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <h2>스타일 가이드 변수 생성기</h2>
+    <div class="desc">MD 파일을 읽어 Figma Variables를 자동으로 생성합니다</div>
+  </div>
+
+  <!-- 폰트 설정 -->
+  <div>
+    <div class="input-header">
+      <span class="input-title">폰트 설정</span>
+      <span id="fontSelectedLabel" class="font-selected-label"></span>
+    </div>
+    <div class="font-search-row">
+      <input type="text" id="fontInput" class="font-input" placeholder="폰트명 검색 (예: Pretendard)">
+      <button class="btn-font-search" id="fontSearchBtn">검색</button>
+    </div>
+    <div id="fontResults" class="font-results"></div>
+  </div>
+
+  <!-- MD 입력 -->
+  <div>
+    <div class="input-header">
+      <span class="input-title">MD 파일</span>
+      <div style="display:flex;gap:6px;align-items:center">
+        <label class="file-label">
+          📂 파일 선택 <input type="file" accept=".md,.txt" id="fileInput" style="display:none">
+        </label>
+        <button class="file-label" id="reloadBtn" style="display:none" title="마지막으로 선택한 파일 다시 불러오기">↺ 새로고침</button>
+      </div>
+    </div>
+    <div id="fileNameLabel" style="font-size:10px;color:#555;margin-bottom:4px;display:none"></div>
+    <textarea id="mdContent" placeholder="MD 파일을 선택하거나 내용을 붙여넣으세요"></textarea>
+    <button class="btn-parse" id="parseBtn">분석하기</button>
+  </div>
+
+  <!-- 미리보기 (분석 후 표시) -->
+  <div class="preview" id="preview" style="display:none">
+    <div class="preview-block">
+      <div class="preview-label">브랜드 컬러 (13단계)</div>
+      <div id="brandPreview"></div>
+    </div>
+    <div class="preview-block">
+      <div class="preview-label">그레이 스케일</div>
+      <div id="grayPreview"></div>
+    </div>
+    <div class="preview-block">
+      <div class="preview-label">시맨틱 컬러 (Base · Background · Line · Text)</div>
+      <div id="semanticPreview"></div>
+    </div>
+    <div class="preview-block">
+      <div class="preview-label">여백(Spacing)</div>
+      <div class="value-chips" id="spacingPreview"></div>
+    </div>
+    <div class="preview-block">
+      <div class="preview-label">둥글기(Radius)</div>
+      <div class="value-chips" id="radiusPreview"></div>
+    </div>
+    <div class="preview-block">
+      <div class="preview-label">타이포그래피 (보드에 자동 포함)</div>
+      <div class="auto-preview-info">
+        <span class="auto-preview-row">Type System: Display · H1 · H2 · H3 · Body Large · Body · Body Small · Caption · Caption SM</span>
+        <span class="auto-preview-row">Font Scale: 10 · 11 · 12 · 13 · 14 · 16 · 18 · 20 · 24 · 28 · 32 · 36 · 40 · 48px</span>
+      </div>
+    </div>
+    <div class="preview-block">
+      <div class="preview-label">버튼 (보드에 자동 포함)</div>
+      <div class="auto-preview-info">
+        <span class="auto-preview-row">Primary / Secondary / Ghost × S / M / L × Default / Hover / Disabled</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 요약 + 생성 버튼 -->
+  <div id="generateSection" style="display:none">
+    <div class="summary" id="summary"></div>
+    <div class="btn-row">
+      <button class="btn-primary" id="generateBtn">Figma Variables 생성</button>
+      <button class="btn-draw" id="drawBtn">보드 그리기</button>
+      <button class="btn-comp" id="compBtn">컴포넌트 생성</button>
+      <button class="btn-secondary" id="cancelBtn">닫기</button>
+    </div>
+  </div>
+
+  <!-- 진행 -->
+  <div class="progress-wrap" id="progressWrap" style="display:none">
+    <progress id="progressBar" value="0" max="100"></progress>
+    <div class="progress-name" id="progressName"></div>
+  </div>
+
+  <div id="result" style="display:none"></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════
+   컬러 유틸리티
+═══════════════════════════════════════ */
+function hexToHsl(hex) {
+  const h = hex.replace('#', '');
+  let r = parseInt(h.slice(0,2),16)/255, g = parseInt(h.slice(2,4),16)/255, b = parseInt(h.slice(4,6),16)/255;
+  const max = Math.max(r,g,b), min = Math.min(r,g,b);
+  let hh, s, l = (max+min)/2;
+  if (max === min) { hh = s = 0; }
+  else {
+    const d = max-min;
+    s = l>0.5 ? d/(2-max-min) : d/(max+min);
+    switch(max) {
+      case r: hh=((g-b)/d+(g<b?6:0))/6; break;
+      case g: hh=((b-r)/d+2)/6; break;
+      case b: hh=((r-g)/d+4)/6; break;
+    }
+  }
+  return { h: hh*360, s: s*100, l: l*100 };
+}
+
+function hslToHex(h, s, l) {
+  h/=360; s/=100; l/=100;
+  let r, g, b;
+  if (s===0) { r=g=b=l; }
+  else {
+    const q = l<0.5 ? l*(1+s) : l+s-l*s, p = 2*l-q;
+    const hue2 = (t) => {
+      if(t<0) t+=1; if(t>1) t-=1;
+      if(t<1/6) return p+(q-p)*6*t;
+      if(t<1/2) return q;
+      if(t<2/3) return p+(q-p)*(2/3-t)*6;
+      return p;
+    };
+    r=hue2(h+1/3); g=hue2(h); b=hue2(h-1/3);
+  }
+  const x = v => Math.round(Math.max(0,Math.min(1,v))*255).toString(16).padStart(2,'0');
+  return '#'+x(r)+x(g)+x(b);
+}
+
+const STEPS = [5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 100];
+
+function generateColorScale(baseHex) {
+  const {h, s, l} = hexToHsl(baseHex);
+  const scale = {};
+  STEPS.forEach(step => {
+    let newL, newS;
+    if (step === 50) { newL = l; newS = s; }
+    else if (step < 50) {
+      const t = (50-step)/50;
+      newL = l + (97-l)*t;
+      newS = s * (1 - t*0.85);
+    } else {
+      const t = (step-50)/50;
+      newL = l * (1 - t*0.88);
+      newS = s * (1 - t*0.3);
+    }
+    scale[step] = hslToHex(h, Math.max(0,Math.min(100,newS)), Math.max(0,Math.min(100,newL)));
+  });
+  return scale;
+}
+
+function generateGrayScale() {
+  const scale = {};
+  const ls = {5:95,10:91,20:82,30:69,40:56,50:44,60:34,70:24,80:16,90:10,95:7,100:4};
+  STEPS.forEach(step => { scale[step] = hslToHex(220, 6, ls[step]); });
+  return scale;
+}
+
+function generateSemanticVariants(baseHex) {
+  const {h, s, l} = hexToHsl(baseHex);
+  return {
+    base:       baseHex,
+    background: hslToHex(h, Math.min(s*0.18, 100), 96),
+    line:       hslToHex(h, Math.min(s*0.45, 100), 84),
+    text:       hslToHex(h, Math.min(s*0.9,  100), Math.max(l*0.55, 18)),
+  };
+}
+
+/* ═══════════════════════════════════════
+   MD 파서
+═══════════════════════════════════════ */
+function parseMD(text) {
+  const result = { brandColors: {}, semanticColors: {}, spacing: [], radius: [], fontFamily: null };
+  const colorPat = /([A-Za-z][\w]*(?:\/[\w]+)*)\(`#([A-Fa-f0-9]{6})`\)/g;
+
+  // 폰트 파싱: [FontName] 패턴
+  const fontMatch = text.match(/^\[([^\]]+)\]/m);
+  if (fontMatch) result.fontFamily = fontMatch[1].trim();
+
+  let section = '';
+  text.split('\n').forEach(line => {
+    // ## 섹션 헤더 추적
+    if (/^##\s/.test(line)) { section = line.replace(/^#+\s*/, '').trim().toLowerCase(); return; }
+
+    colorPat.lastIndex = 0;
+
+    if (line.match(/Brand\s*Colors?/i)) {
+      let m;
+      while ((m = colorPat.exec(line)) !== null) result.brandColors[m[1]] = '#' + m[2];
+
+    } else if (/\*\*Semantic\/(\w+)\*\*/.test(line)) {
+      // 새 형식: **Semantic/Danger**: Base(`#hex`), BG(`#hex`), Line(`#hex`), Text(`#hex`)
+      const nameMatch = line.match(/\*\*Semantic\/(\w+)\*\*/);
+      const semKey = 'Semantic/' + nameMatch[1];
+      const varMap = { base: 'base', bg: 'background', line: 'line', text: 'text' };
+      colorPat.lastIndex = 0;
+      let m;
+      const variants = {};
+      while ((m = colorPat.exec(line)) !== null) {
+        const vk = varMap[m[1].toLowerCase()];
+        if (vk) variants[vk] = '#' + m[2];
+      }
+      if (Object.keys(variants).length > 0) result.semanticColors[semKey] = variants;
+
+    } else if (line.match(/Semantic/i) && line.includes('#')) {
+      // 구 형식 (하위 호환): **Semantic**: Name(`#hex`), ...
+      colorPat.lastIndex = 0;
+      let m;
+      while ((m = colorPat.exec(line)) !== null) result.semanticColors[m[1]] = '#' + m[2];
+
+    } else if (line.match(/Spacing|여백/) && line.includes('최소 단위')) {
+      const m = line.match(/최소 단위 (\d+)px,\s*(\d+)px.*?기본 단위 (\d+)px\s*~\s*(\d+)px.*?(\d+)의 배수/);
+      if (m) {
+        result.spacing.push(+m[1], +m[2]);
+        for (let v = +m[3]; v <= +m[4]; v += +m[5]) result.spacing.push(v);
+      }
+      const maxS = line.match(/최대 단위 (\d+)px/);
+      if (maxS) result.spacing.push(+maxS[1]);
+
+    } else if (line.match(/Radius|둥글기/) && line.includes('최소 단위')) {
+      const m = line.match(/최소 단위 (\d+)px,\s*(\d+)px.*?기본 단위 (\d+)px\s*~\s*(\d+)px.*?(\d+)의 배수/);
+      if (m) {
+        result.radius.push(+m[1], +m[2]);
+        for (let v = +m[3]; v <= +m[4]; v += +m[5]) result.radius.push(v);
+      }
+      const maxR = line.match(/최대 단위 (\d+)px/);
+      if (maxR) result.radius.push(+maxR[1]);
+
+    } else if (/Sizes/i.test(line) && line.includes('px/') && section !== 'button') {
+      // Typography Sizes: 이름(18px/400) 형식
+      const sizePart = line.replace(/.*Sizes[^:]*:\s*/i, '');
+      const sizeMatches = [...sizePart.matchAll(/([가-힣a-zA-Z][가-힣a-zA-Z0-9\s]*?)\s*\((\d+)px\/(\d+)\)/g)];
+      if (sizeMatches.length) {
+        result.typeSizes = sizeMatches.map(m => ({ name: m[1].trim(), size: +m[2], weight: +m[3] }));
+      }
+    }
+
+    // ── Button 섹션 파싱 ──
+    if (section === 'button') {
+      if (/Sizes/i.test(line) && line.includes('px')) {
+        // 신형식: S(40px/17px/400) = 높이/폰트크기/굵기
+        const m3 = [...line.matchAll(/([A-Za-z]+)\((\d+)px\/(\d+)px\/(\d+)\)/g)];
+        if (m3.length) {
+          result.buttonSizes = m3.map(m => ({ name: m[1], h: +m[2], fs: +m[3], fw: +m[4] }));
+        } else {
+          // 구형식: S(32px/12px) = 높이/패딩 (하위 호환)
+          const m2 = [...line.matchAll(/([A-Za-z]+)\((\d+)px\/(\d+)px\)/g)];
+          if (m2.length) result.buttonSizes = m2.map(m => ({ name: m[1], h: +m[2], fs: null, fw: 400 }));
+        }
+      } else if (/\bTypes\b/i.test(line)) {
+        const part = line.replace(/.*Types[^:]*:\s*/i, '');
+        result.buttonTypes = part.split(',').map(s => s.trim()).filter(Boolean);
+      } else if (/\bStates\b/i.test(line)) {
+        const part = line.replace(/.*States[^:]*:\s*/i, '');
+        result.buttonStates = part.split(',').map(s => s.trim()).filter(Boolean);
+      } else if (/\bRadius\b/i.test(line)) {
+        const m = line.match(/(\d+)px/);
+        if (m) result.buttonRadius = +m[1];
+      } else if (/\bIcon\s*Sizes\b/i.test(line)) {
+        const ms = [...line.matchAll(/([A-Za-z]+)\((\d+)px\)/g)];
+        if (ms.length) result.buttonIconSizes = ms.reduce((o, m) => { o[m[1]] = +m[2]; return o; }, {});
+      }
+    }
+
+    // ── Input 섹션 파싱 ──
+    if (section === 'input') {
+      if (/\bSizes\b/i.test(line)) {
+        // 신형식: S(40px/17px/400) = 높이/폰트크기/굵기
+        const m3 = [...line.matchAll(/([A-Za-z]+)\((\d+)px\/(\d+)px\/(\d+)\)/g)];
+        if (m3.length) {
+          result.inputSizes = m3.map(m => ({ name: m[1], h: +m[2], fs: +m[3], fw: +m[4] }));
+        } else {
+          // 구형식: S(32px) = 높이만 (하위 호환)
+          const m1 = [...line.matchAll(/([A-Za-z]+)\((\d+)px\)/g)];
+          if (m1.length) result.inputSizes = m1.map(m => ({ name: m[1], h: +m[2], fs: null, fw: 400 }));
+        }
+      } else if (/\bHeight\b/i.test(line)) {
+        const m = line.match(/(\d+)px/);
+        if (m) result.inputHeight = +m[1];
+      } else if (/\bWidth\b/i.test(line)) {
+        const m = line.match(/(\d+)px/);
+        if (m) result.inputWidth = +m[1];
+      } else if (/\bRadius\b/i.test(line)) {
+        const m = line.match(/(\d+)px/);
+        if (m) result.inputRadius = +m[1];
+      } else if (/\bStates\b/i.test(line)) {
+        const part = line.replace(/.*States[^:]*:\s*/i, '');
+        result.inputStates = part.split(',').map(s => s.trim()).filter(Boolean);
+      } else if (/\bContents\b/i.test(line)) {
+        const part = line.replace(/.*Contents[^:]*:\s*/i, '');
+        result.inputContents = part.split(',').map(s => s.trim()).filter(Boolean);
+      }
+    }
+  });
+
+  return result;
+}
+
+/* ═══════════════════════════════════════
+   미리보기 렌더링
+═══════════════════════════════════════ */
+function renderSwatchRow(name, scale) {
+  const swatches = STEPS.map(step => {
+    const isBase = step === 50;
+    return `<div class="swatch${isBase?' base-mark':''}" style="background:${scale[step]}" data-tip="${step}: ${scale[step]}"></div>`;
+  }).join('');
+  return `<div class="color-row"><span class="color-name">${name}</span><div class="swatches">${swatches}</div></div>`;
+}
+
+function renderPreview(parsed, processed) {
+  // 브랜드 컬러
+  document.getElementById('brandPreview').innerHTML =
+    Object.entries(processed.brand).map(([name, d]) => renderSwatchRow(name, d.scale)).join('');
+
+  // 그레이
+  document.getElementById('grayPreview').innerHTML = renderSwatchRow('Gray', processed.gray.scale);
+
+  // 시맨틱
+  document.getElementById('semanticPreview').innerHTML =
+    Object.entries(processed.semantic).map(([name, v]) => `
+      <div class="semantic-row">
+        <span class="semantic-name">${name}</span>
+        <div class="semantic-chips">
+          ${Object.entries(v).map(([k, hex]) => `
+            <div class="semantic-chip">
+              <div class="semantic-swatch" style="background:${hex}"></div>
+              <span class="semantic-chip-label">${{base:'Base',background:'BG',line:'Line',text:'Text'}[k]||k}</span>
+            </div>`).join('')}
+        </div>
+      </div>`).join('');
+
+  // 여백
+  document.getElementById('spacingPreview').innerHTML =
+    parsed.spacing.map(v => `<span class="chip">${v}</span>`).join('');
+
+  // 둥글기
+  document.getElementById('radiusPreview').innerHTML =
+    parsed.radius.map(v => `<span class="chip">${v}</span>`).join('');
+}
+
+/* ═══════════════════════════════════════
+   상태 관리
+═══════════════════════════════════════ */
+let processedData = null;
+let selectedFont = null;
+
+function processData(parsed) {
+  const brand = {};
+  for (const [name, hex] of Object.entries(parsed.brandColors)) {
+    brand[name] = { hex, scale: generateColorScale(hex) };
+  }
+
+  const semantic = {};
+  for (const [name, val] of Object.entries(parsed.semanticColors)) {
+    // 새 형식: { base, background, line, text } 직접 지정 / 구 형식: 단일 hex 자동 계산
+    semantic[name] = (typeof val === 'object') ? val : generateSemanticVariants(val);
+  }
+
+  let total = 0;
+  for (const d of Object.values(brand)) total += Object.keys(d.scale).length;
+  total += STEPS.length; // gray
+  for (const v of Object.values(semantic)) total += Object.keys(v).length;
+  total += parsed.spacing.length + parsed.radius.length;
+
+  return {
+    brand, semantic, gray: { scale: generateGrayScale() },
+    spacing: parsed.spacing, radius: parsed.radius, total,
+    fontFamily:   parsed.fontFamily   || null,
+    typeSizes:    parsed.typeSizes    || null,
+    buttonSizes:     parsed.buttonSizes     || null,
+    buttonTypes:     parsed.buttonTypes     || null,
+    buttonStates:    parsed.buttonStates    || null,
+    buttonRadius:    parsed.buttonRadius    || null,
+    buttonIconSizes: parsed.buttonIconSizes || null,
+    inputSizes:    parsed.inputSizes    || null,
+    inputHeight:   parsed.inputHeight   || null,
+    inputWidth:    parsed.inputWidth    || null,
+    inputRadius:   parsed.inputRadius   || null,
+    inputStates:   parsed.inputStates   || null,
+    inputContents: parsed.inputContents || null,
+  };
+}
+
+/* ═══════════════════════════════════════
+   이벤트
+═══════════════════════════════════════ */
+// 폰트 검색
+function applyFontSelection(fam) {
+  selectedFont = fam;
+  document.getElementById('fontInput').value = fam;
+  document.getElementById('fontSelectedLabel').textContent = '✓ ' + fam;
+  if (processedData) processedData.fontFamily = fam;
+  document.querySelectorAll('.font-result-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.fam === fam);
+  });
+}
+
+document.getElementById('fontSearchBtn').addEventListener('click', () => {
+  const q = document.getElementById('fontInput').value.trim();
+  document.getElementById('fontResults').innerHTML = '<div class="font-result-item" style="color:#555;cursor:default">검색 중...</div>';
+  parent.postMessage({ pluginMessage: { type: 'search-fonts', query: q } }, '*');
+});
+
+document.getElementById('fontInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('fontSearchBtn').click();
+});
+
+// 파일 읽기 공통 함수 — 읽은 뒤 자동으로 파싱까지 실행
+let lastFile = null;
+
+function loadMdFile(file) {
+  if (!file) return;
+  lastFile = file;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    document.getElementById('mdContent').value = ev.target.result;
+    const label = document.getElementById('fileNameLabel');
+    label.textContent = '📄 ' + file.name;
+    label.style.display = 'block';
+    document.getElementById('reloadBtn').style.display = 'inline-block';
+    // 파일 선택 즉시 자동 파싱
+    document.getElementById('parseBtn').click();
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+document.getElementById('fileInput').addEventListener('change', (e) => {
+  loadMdFile(e.target.files[0]);
+});
+
+// 같은 파일 다시 불러오기 (MD 수정 후 새로고침)
+document.getElementById('reloadBtn').addEventListener('click', () => {
+  if (lastFile) loadMdFile(lastFile);
+});
+
+// 분석하기
+document.getElementById('parseBtn').addEventListener('click', () => {
+  const text = document.getElementById('mdContent').value.trim();
+  if (!text) { alert('MD 내용을 입력해주세요.'); return; }
+
+  const parsed = parseMD(text);
+  const brandCount = Object.keys(parsed.brandColors).length;
+  const semanticCount = Object.keys(parsed.semanticColors).length;
+
+  if (brandCount === 0 && semanticCount === 0) {
+    alert('컬러 정보를 찾지 못했습니다.\nMD 파일 형식을 확인해주세요.');
+    return;
+  }
+
+  processedData = processData(parsed);
+  renderPreview(parsed, processedData);
+
+  // MD에서 폰트 감지 시 자동 입력
+  if (processedData.fontFamily && !selectedFont) {
+    applyFontSelection(processedData.fontFamily);
+  }
+
+  document.getElementById('preview').style.display = 'flex';
+  document.getElementById('generateSection').style.display = 'block';
+  const fontInfo = processedData.fontFamily ? ` · 폰트: ${processedData.fontFamily}` : '';
+  document.getElementById('summary').textContent =
+    `총 ${processedData.total}개 Variables 생성 예정 (브랜드 ${brandCount}색 × 13단계, 시맨틱 ${semanticCount}색, 여백 ${parsed.spacing.length}개, 둥글기 ${parsed.radius.length}개) · 보드에 타이포그래피 및 버튼 포함${fontInfo}`;
+  document.getElementById('result').style.display = 'none';
+});
+
+// 생성 시작
+document.getElementById('generateBtn').addEventListener('click', () => {
+  if (!processedData) return;
+  document.getElementById('generateBtn').disabled = true;
+  document.getElementById('result').style.display = 'none';
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('progressBar').value = 0;
+  parent.postMessage({ pluginMessage: { type: 'create-variables', data: processedData } }, '*');
+});
+
+document.getElementById('cancelBtn').addEventListener('click', () => {
+  parent.postMessage({ pluginMessage: { type: 'cancel' } }, '*');
+});
+
+// 보드 그리기
+document.getElementById('drawBtn').addEventListener('click', () => {
+  if (!processedData) return;
+  if (selectedFont) processedData.fontFamily = selectedFont;
+  document.getElementById('drawBtn').disabled = true;
+  document.getElementById('generateBtn').disabled = true;
+  document.getElementById('compBtn').disabled = true;
+  document.getElementById('result').style.display = 'none';
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('progressBar').value = 0;
+  document.getElementById('progressName').textContent = '보드 그리는 중...';
+  parent.postMessage({ pluginMessage: { type: 'draw-style-guide', data: processedData } }, '*');
+});
+
+// 컴포넌트 생성
+document.getElementById('compBtn').addEventListener('click', () => {
+  if (!processedData) return;
+  if (selectedFont) processedData.fontFamily = selectedFont;
+  document.getElementById('compBtn').disabled = true;
+  document.getElementById('drawBtn').disabled = true;
+  document.getElementById('generateBtn').disabled = true;
+  document.getElementById('result').style.display = 'none';
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('progressBar').value = 30;
+  document.getElementById('progressName').textContent = '컴포넌트 생성 중...';
+  parent.postMessage({ pluginMessage: { type: 'create-components', data: processedData } }, '*');
+});
+
+// code.js → ui 메시지 수신
+window.onmessage = (event) => {
+  const msg = event.data.pluginMessage;
+  if (!msg) return;
+
+  if (msg.type === 'font-search-result') {
+    const container = document.getElementById('fontResults');
+    if (!msg.families.length) {
+      container.innerHTML = '<div class="font-result-item" style="color:#555;cursor:default">검색 결과 없음</div>';
+      return;
+    }
+    container.innerHTML = msg.families.map(fam =>
+      `<div class="font-result-item${selectedFont === fam ? ' active' : ''}" data-fam="${fam}">${fam}</div>`
+    ).join('');
+    container.querySelectorAll('.font-result-item[data-fam]').forEach(el => {
+      el.addEventListener('click', () => applyFontSelection(el.dataset.fam));
+    });
+
+  } else if (msg.type === 'progress') {
+    const pct = Math.round((msg.current / msg.total) * 100);
+    document.getElementById('progressBar').value = pct;
+    document.getElementById('progressName').textContent = msg.name;
+
+  } else if (msg.type === 'comp-progress') {
+    document.getElementById('progressBar').value = 60;
+    document.getElementById('progressName').textContent = msg.msg;
+
+  } else if (msg.type === 'comp-done') {
+    document.getElementById('compBtn').disabled = false;
+    document.getElementById('drawBtn').disabled = false;
+    document.getElementById('generateBtn').disabled = false;
+    document.getElementById('progressWrap').style.display = 'none';
+    const el = document.getElementById('result');
+    el.textContent = `✅ 컴포넌트 생성 완료! Button ${msg.btnVariantCount}개 Variant · Input ${msg.inputVariantCount}개 Variant → [📦 Components] 페이지 확인`;
+    el.className = 'result success';
+    el.style.display = 'block';
+
+  } else if (msg.type === 'done') {
+    document.getElementById('generateBtn').disabled = false;
+    document.getElementById('drawBtn').disabled = false;
+    document.getElementById('compBtn').disabled = false;
+    document.getElementById('progressWrap').style.display = 'none';
+    const el = document.getElementById('result');
+    el.textContent = `✅ ${msg.count}개 Variables가 Figma에 등록되었습니다!`;
+    el.className = 'result success';
+    el.style.display = 'block';
+
+  } else if (msg.type === 'draw-progress') {
+    document.getElementById('progressBar').value = 50;
+    document.getElementById('progressName').textContent = msg.msg;
+
+  } else if (msg.type === 'draw-done') {
+    document.getElementById('drawBtn').disabled = false;
+    document.getElementById('generateBtn').disabled = false;
+    document.getElementById('compBtn').disabled = false;
+    document.getElementById('progressWrap').style.display = 'none';
+    const el = document.getElementById('result');
+    const fontNote = msg.fontFamily ? ` · 폰트: ${msg.fontFamily}` : '';
+    el.textContent = `✅ 스타일 가이드 보드가 캔버스에 그려졌습니다! (텍스트 스타일 ${msg.textStyleCount || 9}개 생성됨${fontNote})`;
+    el.className = 'result success';
+    el.style.display = 'block';
+
+  } else if (msg.type === 'error') {
+    document.getElementById('generateBtn').disabled = false;
+    document.getElementById('drawBtn').disabled = false;
+    document.getElementById('compBtn').disabled = false;
+    document.getElementById('progressWrap').style.display = 'none';
+    const el = document.getElementById('result');
+    el.textContent = '❌ ' + msg.message;
+    el.className = 'result error';
+    el.style.display = 'block';
+  }
+};
+</script>
+</body>
+</html>

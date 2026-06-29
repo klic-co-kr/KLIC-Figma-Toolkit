@@ -1,0 +1,8 @@
+{
+  "name": "메뉴 페이지 생성기",
+  "id": "com.plugin.menu-page-generator",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"]
+}

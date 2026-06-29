@@ -1,0 +1,15 @@
+{
+  "name": "KLIC Figma Toolkit",
+  "id": "com.klic.figma-toolkit",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": [
+      "*"
+    ],
+    "reasoning": "Allows menu extraction from user-entered public website URLs and access to the local Folder Maker bridge on this workstation."
+  }
+}

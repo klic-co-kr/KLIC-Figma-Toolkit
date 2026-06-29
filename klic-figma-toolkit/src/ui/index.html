@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<!-- @klic-generated -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>KLIC Figma Toolkit</title>
+<!-- @klic-styles -->
+</head>
+<body>
+<div class="root">
+
+  <!-- ═══ Top bar ═══ -->
+  <div class="topbar">
+    <span class="brand">KLIC Figma Toolkit</span>
+    <div class="topbar-actions">
+      <div class="size-toggle" aria-label="Panel size">
+        <button class="size-btn" id="size-compact" onclick="resizeUi('compact')" data-i18n-title="ui.sizeCompact">S</button>
+        <button class="size-btn active" id="size-default" onclick="resizeUi('default')" data-i18n-title="ui.sizeDefault">M</button>
+        <button class="size-btn" id="size-wide" onclick="resizeUi('wide')" data-i18n-title="ui.sizeWide">L</button>
+      </div>
+      <div class="lang-toggle">
+        <button class="lang-btn active" id="lang-en" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" id="lang-ko" onclick="setLang('ko')">한국어</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Tool tabs ═══ -->
+  <div class="tool-tabs">
+    <button class="tool-tab active" id="tool-command" onclick="switchTool('command')" data-i18n="tool.command">Command Center</button>
+    <button class="tool-tab"        id="tool-menu"   onclick="switchTool('menu')"   data-i18n="tool.menu">Menu Page</button>
+    <button class="tool-tab"        id="tool-style"  onclick="switchTool('style')"  data-i18n="tool.style">Style Guide</button>
+    <button class="tool-tab"        id="tool-table"  onclick="switchTool('table')"  data-i18n="tool.table">Table Builder</button>
+    <button class="tool-tab"        id="tool-qa"     onclick="switchTool('qa')"     data-i18n="tool.qa">QA</button>
+    <button class="tool-tab"        id="tool-handoff" onclick="switchTool('handoff')" data-i18n="tool.handoff">Handoff</button>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       PANE: COMMAND CENTER
+       ════════════════════════════════════════════════════════════════════ -->
+  <div class="tool-pane active" id="pane-command">
+    <div>
+      <div class="panel-title" data-i18n="command.title">Design Ops Command Center</div>
+      <div class="panel-desc" data-i18n="command.desc">Audit, token binding, generation, and handoff tools in one professional workspace.</div>
+    </div>
+
+    <div class="command-shell">
+      <div class="command-grid">
+        <div class="command-main">
+          <div class="health-row">
+            <div class="health-score">
+              <strong id="command-health-score">--</strong>
+              <span data-i18n="command.health">system health</span>
+            </div>
+            <div class="health-metrics">
+              <div class="health-metric"><b id="command-raw-fills">--</b><span data-i18n="command.rawFills">raw fills</span></div>
+              <div class="health-metric"><b id="command-raw-strokes">--</b><span data-i18n="command.rawStrokes">raw strokes</span></div>
+              <div class="health-metric"><b id="command-exact-matches">--</b><span data-i18n="command.matches">RGB exact</span></div>
+              <div class="health-metric"><b id="command-klic-nodes">--</b><span data-i18n="command.klicNodes">KLIC nodes</span></div>
+            </div>
+          </div>
+
+          <div class="command-pipeline-panel">
+            <div class="command-pipeline-head">
+              <div>
+                <div class="section-label" data-i18n="command.pipelineTitle">Project Pipeline</div>
+                <div class="command-pipeline-summary" id="command-pipeline-summary" data-i18n="command.pipelineSummary">Public/education website · KRDS/KWCAG first</div>
+              </div>
+              <label>
+                <span data-i18n="command.projectType">Project type</span>
+                <select id="command-project-type">
+                  <option value="public-education" selected data-i18n="command.projectPublicEducation">Public/Education</option>
+                  <option value="saas-admin" data-i18n="command.projectSaasAdmin">SaaS/Admin</option>
+                  <option value="corporate" data-i18n="command.projectCorporate">Corporate</option>
+                </select>
+              </label>
+            </div>
+            <div class="command-pipeline" id="command-pipeline"></div>
+          </div>
+
+          <div class="command-actions">
+            <button class="btn" id="command-refresh-selection" data-i18n="command.refreshSelection">Refresh selection</button>
+            <button class="btn" id="command-refresh-page" data-i18n="command.refreshPage">Refresh page</button>
+          </div>
+
+          <div class="command-issues">
+            <div class="command-issue"><div class="severity-red"></div><span id="command-issue-raw" data-i18n="command.issueRaw">Unbound solid fills and strokes will appear here after refresh</span><div class="quick-action" data-i18n="command.bind">Bind</div></div>
+            <div class="command-issue"><div class="severity-yellow"></div><span id="command-issue-match" data-i18n="command.issueMatch">Exact variable matches will appear here after preview</span><div class="quick-action" data-i18n="command.preview">Preview</div></div>
+            <div class="command-issue"><div class="severity-green"></div><span id="command-issue-generated" data-i18n="command.issueGenerated">KLIC generated nodes are tracked with plugin data</span><div class="quick-action" data-i18n="command.audit">Audit</div></div>
+          </div>
+
+          <div class="binding-list" id="command-binding-list"></div>
+
+          <div class="command-note" data-i18n="command.note">Command Center is now the overview hub. Detailed work lives in Style, QA, and Handoff.</div>
+        </div>
+        <div class="command-side">
+          <div class="side-label" data-i18n="command.inspector">Inspector</div>
+          <div class="side-chip" onclick="switchTool('style')" data-i18n="command.goStyle">Style binding</div>
+          <div class="side-chip" onclick="switchTool('qa')" data-i18n="command.goQa">QA checks</div>
+          <div class="side-chip" onclick="switchTool('handoff')" data-i18n="command.goHandoff">Handoff</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       PANE: MENU PAGE GENERATOR
+       ════════════════════════════════════════════════════════════════════ -->
+  <div class="tool-pane" id="pane-menu">
+
+    <div class="sub-tabs">
+      <button class="sub-tab active" id="menu-tab-url"  onclick="menuSwitchInput('url')"  data-i18n="menu.tabUrl">URL Input</button>
+      <button class="sub-tab"        id="menu-tab-html" onclick="menuSwitchInput('html')" data-i18n="menu.tabHtml">HTML Source</button>
+    </div>
+
+    <!-- URL panel -->
+    <div class="sub-panel active" id="menu-panel-url">
+      <div class="row">
+        <input type="text" class="grow" id="menu-url" data-i18n-ph="menu.urlPh">
+        <button class="btn" id="menu-fetch" data-i18n="menu.extract">Extract Menu</button>
+      </div>
+      <div class="status idle" id="menu-fetch-status"></div>
+    </div>
+
+    <!-- HTML source panel -->
+    <div class="sub-panel" id="menu-panel-html">
+      <textarea id="menu-html-input" rows="4" data-i18n-ph="menu.htmlPh"></textarea>
+      <button class="btn btn-block" id="menu-parse" data-i18n="menu.parseHtml">Parse HTML</button>
+      <div class="status idle" id="menu-html-status"></div>
+    </div>
+
+    <!-- CSV input -->
+    <div class="collapse-toggle" id="menu-excel-toggle" onclick="menuToggleExcel()" data-i18n="menu.excelToggle">▶ Load from Excel (CSV)</div>
+    <div class="collapse-section" id="menu-excel-section">
+      <div class="hint" data-i18n-html="menu.csvHint"></div>
+      <div class="row" style="margin-top:8px">
+        <label class="file-label">
+          <span data-i18n="menu.selectCsv">Select CSV file</span>
+          <input type="file" accept=".csv,.txt" id="menu-csv-file" style="display:none">
+        </label>
+        <button class="btn" id="menu-sample-csv" data-i18n="menu.sampleCsv">Load sample CSV</button>
+        <span class="file-name" id="menu-csv-name" data-i18n="menu.noFile">No file selected</span>
+      </div>
+      <div class="map-row" style="margin-top:8px">
+        <span class="map-label" data-i18n="menu.encoding">Encoding</span>
+        <select class="col-select" id="menu-encoding">
+          <option value="UTF-8">UTF-8</option>
+          <option value="EUC-KR">EUC-KR</option>
+          <option value="CP949">CP949</option>
+        </select>
+      </div>
+      <div id="menu-mapping" style="display:none">
+        <div class="map-row">
+          <span class="map-label" data-i18n="menu.nameCol">Name col</span>
+          <select class="col-select" id="menu-name-col"></select>
+        </div>
+        <div class="map-row">
+          <span class="map-label" data-i18n="menu.pathMode">Path</span>
+          <select class="col-select" id="menu-path-mode" onchange="menuUpdatePathMode()">
+            <option value="levels" data-i18n="menu.pathLevels">Auto-combine level columns</option>
+            <option value="single" data-i18n="menu.pathSingle">Single path column</option>
+            <option value="nameonly" data-i18n="menu.pathNameonly">Name only</option>
+          </select>
+        </div>
+        <div class="map-row" id="menu-path-col-row" style="display:none">
+          <span class="map-label" data-i18n="menu.pathCol">Path col</span>
+          <select class="col-select" id="menu-path-col"></select>
+        </div>
+        <div class="map-row">
+          <span class="map-label" data-i18n="menu.categoryCol">Category</span>
+          <select class="col-select" id="menu-category-col"></select>
+        </div>
+        <div class="map-row" id="menu-cat-row">
+          <span class="map-label" data-i18n="menu.includeCat">Include</span>
+          <div class="cat-chips" id="menu-cat-chips"></div>
+        </div>
+        <button class="btn-primary btn-block" id="menu-apply-csv" data-i18n="menu.applyCsv">Apply this menu data</button>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <button class="btn btn-block" id="menu-register-template" data-i18n="menu.registerTemplate">Use selected frame as [sub_page]</button>
+
+    <!-- Keyword filter -->
+    <div>
+      <div class="row">
+        <input type="text" class="grow" id="menu-filter" data-i18n-ph="menu.filterPh">
+        <button class="btn" id="menu-filter-add" data-i18n="menu.add">Add</button>
+      </div>
+      <div class="filter-tags" id="menu-filter-tags"></div>
+    </div>
+
+    <!-- Menu list -->
+    <div class="list-header">
+      <span class="list-title" data-i18n="menu.listTitle">Menu List</span>
+      <div class="list-right">
+        <button class="link-btn" onclick="menuToggleAll(true)"  data-i18n="menu.selectAll">Select All</button>
+        <button class="link-btn" onclick="menuToggleAll(false)" data-i18n="menu.deselectAll">Clear</button>
+        <span class="list-count" id="menu-count">0</span>
+      </div>
+    </div>
+    <div class="diagnostic-summary" id="menu-diagnostics"></div>
+    <div class="scroll-list" id="menu-list">
+      <div style="color:#555;text-align:center;padding:20px 0;" data-i18n="menu.emptyHint">Enter a URL and extract the menu</div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-primary" id="menu-generate" disabled data-i18n="menu.generate">Generate</button>
+      <button class="btn-secondary" id="menu-cancel" data-i18n="common.close">Close</button>
+    </div>
+
+    <div class="progress-wrap" id="menu-progress-wrap">
+      <progress id="menu-progress-bar" value="0" max="100"></progress>
+      <div class="progress-label" id="menu-progress-label"></div>
+    </div>
+    <div class="result" id="menu-result"></div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       PANE: STYLE GUIDE VARIABLE GENERATOR
+       ════════════════════════════════════════════════════════════════════ -->
+  <div class="tool-pane" id="pane-style">
+
+    <div>
+      <div class="panel-title" data-i18n="style.title">Style Guide Generator</div>
+      <div class="panel-desc" data-i18n="style.desc">Reads an MD file and auto-creates Figma Variables</div>
+    </div>
+
+    <div class="workspace-panel">
+      <div class="section-label" data-i18n="style.bindingTitle">Variable binding</div>
+      <div class="panel-desc" data-i18n="style.bindingDesc">Preview RGB exact matches, inspect OKLCH suggestions, and apply selected bindings.</div>
+      <div class="workspace-options">
+        <label><span data-i18n="command.oklchThreshold">OKLCH threshold</span><input type="number" id="command-oklch-threshold" value="0.08" min="0" max="0.5" step="0.01"></label>
+        <label style="grid-column:1 / -1"><span data-i18n="command.collectionPriority">Collection priority</span><input type="text" id="command-collection-priority" value="컬러/브랜드, 컬러/시맨틱, 컬러/그레이"></label>
+        <label class="inline-option" style="grid-column:1 / -1"><input type="checkbox" id="command-include-oklch-apply"><span data-i18n="command.includeOklchApply">Allow applying OKLCH suggestions</span></label>
+      </div>
+      <div class="workspace-actions">
+        <button class="btn" id="command-preview-bindings" data-i18n="command.previewBindings">Preview bindings</button>
+        <button class="btn" id="command-apply-bindings" data-i18n="command.applyBindings">Apply selected</button>
+      </div>
+      <div class="binding-list" id="style-binding-list"></div>
+    </div>
+
+    <!-- Font -->
+    <div>
+      <div class="list-header">
+        <span class="field-label" data-i18n="style.font">Font</span>
+        <span class="font-selected" id="style-font-label"></span>
+      </div>
+      <div class="row">
+        <input type="text" class="grow" id="style-font-input" data-i18n-ph="style.fontPh">
+        <button class="btn" id="style-font-search" data-i18n="style.search">Search</button>
+      </div>
+      <div class="font-results" id="style-font-results"></div>
+    </div>
+
+    <!-- MD input -->
+    <div>
+      <div class="list-header">
+        <span class="field-label" data-i18n="style.mdFile">MD File</span>
+        <div style="display:flex;gap:6px;align-items:center">
+          <label class="file-label">
+            📂 <span data-i18n="style.selectFile">Select file</span>
+            <input type="file" accept=".md,.txt" id="style-file-input" style="display:none">
+          </label>
+          <button class="file-label" id="style-load-sample" data-i18n="style.loadSample">Load ver2 sample</button>
+          <button class="file-label" id="style-export-md" data-i18n="style.exportMd">Export MD</button>
+          <button class="file-label" id="style-export-json" data-i18n="style.exportJson">Export JSON</button>
+          <label class="file-label">
+            <span data-i18n="style.importJson">Import JSON</span>
+            <input type="file" accept=".json,application/json" id="style-json-input" style="display:none">
+          </label>
+          <button class="file-label" id="style-reload" style="display:none" data-i18n-title="style.reloadTitle" data-i18n="style.reload">↺ Reload</button>
+        </div>
+      </div>
+      <div class="file-name" id="style-file-name" style="margin-bottom:4px;display:none"></div>
+      <textarea id="style-md" rows="4" data-i18n-ph="style.mdPh"></textarea>
+      <button class="btn btn-block" id="style-parse" data-i18n="style.parse">Parse</button>
+    </div>
+
+    <!-- Preview -->
+    <div class="preview" id="style-preview">
+      <div>
+        <div class="preview-label" data-i18n="style.brandPrev">Brand Colors (13 steps)</div>
+        <div id="style-brand-prev"></div>
+      </div>
+      <div>
+        <div class="preview-label" data-i18n="style.grayPrev">Gray Scale</div>
+        <div id="style-gray-prev"></div>
+      </div>
+      <div>
+        <div class="preview-label" data-i18n="style.semanticPrev">Semantic Colors (Base · BG · Line · Text)</div>
+        <div id="style-semantic-prev"></div>
+      </div>
+      <div>
+        <div class="preview-label" data-i18n="style.spacingPrev">Spacing</div>
+        <div class="value-chips" id="style-spacing-prev"></div>
+      </div>
+      <div>
+        <div class="preview-label" data-i18n="style.radiusPrev">Radius</div>
+        <div class="value-chips" id="style-radius-prev"></div>
+      </div>
+    </div>
+
+    <div id="style-gen-section" style="display:none">
+      <div class="summary" id="style-summary"></div>
+      <div class="btn-row">
+        <button class="btn-primary" id="style-generate" data-i18n="style.genVars">Create Variables</button>
+        <button class="btn-draw" id="style-draw" data-i18n="style.drawBoard">Draw Board</button>
+        <button class="btn-comp" id="style-comp" data-i18n="style.genComp">Components</button>
+        <button class="btn-secondary" id="style-cancel" data-i18n="common.close">Close</button>
+      </div>
+    </div>
+
+    <div class="progress-wrap" id="style-progress-wrap">
+      <progress id="style-progress-bar" value="0" max="100"></progress>
+      <div class="progress-name" id="style-progress-name"></div>
+    </div>
+    <div class="result" id="style-result"></div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       PANE: TABLE GENERATOR
+       ════════════════════════════════════════════════════════════════════ -->
+  <div class="tool-pane" id="pane-table">
+
+    <div class="sub-tabs">
+      <button class="sub-tab active" id="table-tab-unified" onclick="tableSwitchTab('unified')" data-i18n="table.tabUnified">Unified</button>
+      <button class="sub-tab"        id="table-tab-split"   onclick="tableSwitchTab('split')"   data-i18n="table.tabSplit">Split</button>
+      <button class="sub-tab"        id="table-tab-html"    onclick="tableSwitchTab('html')"    data-i18n="table.tabHtml">HTML</button>
+    </div>
+
+    <!-- Unified pane -->
+    <div class="sub-panel active" id="table-pane-unified">
+      <textarea id="table-paste-unified" rows="4" data-i18n-ph="table.unifiedPh"></textarea>
+      <div class="detected idle" id="table-det-unified"></div>
+      <div class="toggles">
+        <label class="toggle"><input type="checkbox" id="table-has-header" checked><span data-i18n="table.firstHeader">First row → Header</span></label>
+        <label class="toggle"><input type="checkbox" id="table-has-footer"><span data-i18n="table.lastFooter">Last row → Footer</span></label>
+        <label class="toggle"><input type="checkbox" id="table-striped" checked><span data-i18n="table.striped">Striped rows</span></label>
+      </div>
+    </div>
+
+    <!-- Split pane -->
+    <div class="sub-panel" id="table-pane-split">
+      <div>
+        <div class="field-label" data-i18n="table.header">Header <span class="hint">(optional)</span></div>
+        <textarea id="table-paste-header" rows="2" style="margin-top:3px"></textarea>
+        <div class="detected idle" id="table-det-header">—</div>
+      </div>
+      <div>
+        <div class="field-label" data-i18n="table.body">Body</div>
+        <textarea id="table-paste-body" rows="2" style="margin-top:3px"></textarea>
+        <div class="detected idle" id="table-det-body"></div>
+      </div>
+      <div>
+        <div class="field-label" data-i18n="table.footer">Footer <span class="hint">(optional)</span></div>
+        <textarea id="table-paste-footer" rows="2" style="margin-top:3px"></textarea>
+        <div class="detected idle" id="table-det-footer">—</div>
+      </div>
+      <label class="toggle"><input type="checkbox" id="table-striped-split" checked><span data-i18n="table.striped">Striped rows</span></label>
+    </div>
+
+    <!-- HTML pane -->
+    <div class="sub-panel" id="table-pane-html">
+      <textarea id="table-paste-html" rows="5" data-i18n-ph="table.htmlPh"></textarea>
+      <div class="detected idle" id="table-det-html"></div>
+      <label class="toggle"><input type="checkbox" id="table-striped-html" checked><span data-i18n="table.striped">Striped rows</span></label>
+    </div>
+
+    <!-- Table width -->
+    <div class="row">
+      <label style="font-size:12px;color:#ccc" data-i18n="table.preset">Preset</label>
+      <select id="table-preset" class="col-select">
+        <option value="default" data-i18n="table.presetDefault">Default</option>
+        <option value="krds" data-i18n="table.presetKrds">KRDS</option>
+        <option value="admin" data-i18n="table.presetAdmin">Admin</option>
+        <option value="report" data-i18n="table.presetReport">Report</option>
+        <option value="compact" data-i18n="table.presetCompact">Compact</option>
+      </select>
+    </div>
+
+    <!-- Table width -->
+    <div class="row">
+      <label style="font-size:12px;color:#ccc" data-i18n="table.width">Table width</label>
+      <input type="number" id="table-width" value="1400" min="200" max="4000">
+      <span class="unit">px</span>
+    </div>
+
+    <!-- Colors -->
+    <div>
+      <div class="section-label" data-i18n="table.colors">Colors</div>
+      <div class="color-rows" id="table-color-rows"></div>
+    </div>
+
+    <!-- Advanced -->
+    <div class="adv-toggle" id="table-adv-toggle" onclick="tableToggleAdv()">
+      <span class="adv-label" data-i18n="table.advanced">Advanced</span>
+      <span class="adv-arrow">▼</span>
+    </div>
+    <div class="adv-panel" id="table-adv-panel">
+      <div class="inputs-grid">
+        <div class="input-group">
+          <label data-i18n="table.padV">Padding (V)</label>
+          <div class="row-in"><input type="number" id="table-pad-v" value="12" min="4" max="32"><span class="unit">px</span></div>
+        </div>
+        <div class="input-group">
+          <label data-i18n="table.padH">Padding (H)</label>
+          <div class="row-in"><input type="number" id="table-pad-h" value="16" min="4" max="48"><span class="unit">px</span></div>
+        </div>
+        <div class="input-group">
+          <label data-i18n="table.minColW">Min col width</label>
+          <div class="row-in"><input type="number" id="table-min-col-w" min="0" max="400" data-i18n-ph="table.auto"><span class="unit">px</span></div>
+        </div>
+        <div class="input-group">
+          <label data-i18n="table.fontSize">Font size</label>
+          <div class="row-in"><input type="number" id="table-font-size" value="18" min="10" max="24"><span class="unit">px</span></div>
+        </div>
+        <div class="input-group">
+          <label data-i18n="table.minRowH">Min row height</label>
+          <div class="row-in"><input type="number" id="table-min-row-h" value="48" min="20" max="200"><span class="unit">px</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="diagnostic-summary" id="table-diagnostics"></div>
+    <button class="btn-primary btn-block" id="table-generate" disabled data-i18n="table.generate">Generate Table</button>
+    <div class="status" id="table-status"></div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       PANE: QA
+       ════════════════════════════════════════════════════════════════════ -->
+  <div class="tool-pane" id="pane-qa">
+    <div>
+      <div class="panel-title" data-i18n="qa.title">Quality Assurance</div>
+      <div class="panel-desc" data-i18n="qa.desc">Run accessibility, component, and token governance checks.</div>
+    </div>
+
+    <div class="workspace-panel">
+      <div class="workspace-options">
+        <label><span data-i18n="command.scanLimit">Scan limit</span><input type="number" id="command-scan-limit" value="2000" min="50" max="10000"></label>
+      </div>
+      <div class="workspace-actions">
+        <button class="btn" id="command-kwcag-krds-audit" data-i18n="command.kwcagKrdsAudit">KWCAG/KRDS audit</button>
+        <button class="btn" id="command-component-qa" data-i18n="command.componentQa">Component QA</button>
+        <button class="btn" id="command-token-governance" data-i18n="command.tokenGovernance">Token governance</button>
+        <button class="btn" id="command-cancel-scan" data-i18n="command.cancelScan">Cancel scan</button>
+      </div>
+      <div class="binding-list" id="qa-result-list"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       PANE: HANDOFF
+       ════════════════════════════════════════════════════════════════════ -->
+  <div class="tool-pane" id="pane-handoff">
+    <div>
+      <div class="panel-title" data-i18n="handoff.title">Handoff</div>
+      <div class="panel-desc" data-i18n="handoff.desc">Export tokens, create reports, run runtime smoke checks, and open delivery utilities.</div>
+    </div>
+
+    <div class="workspace-panel">
+      <div class="workspace-actions">
+        <button class="btn" id="command-export-tokens" data-i18n="command.exportTokens">Export tokens</button>
+        <button class="btn" id="command-create-report-board" data-i18n="command.createReport">Create report</button>
+        <button class="btn" id="command-run-smoke-test" data-i18n="command.runSmokeTest">Run smoke test</button>
+      </div>
+      <div class="command-local-tool">
+        <span><strong data-i18n="command.folderMakerTitle">Folder Maker</strong><br><span data-i18n="command.folderMakerGuide">Upload CSV in the Folder Maker window, choose output/template file, then preview or create folders from the existing script.</span></span>
+        <button class="btn" id="command-open-folder-maker" data-i18n="command.openFolderMaker">Open Folder Maker</button>
+      </div>
+      <div class="binding-list" id="handoff-result-list"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- @klic-script -->
+</body>
+</html>
