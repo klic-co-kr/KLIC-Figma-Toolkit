@@ -920,4 +920,35 @@ const isBlack = appliedColor.r === 0 && appliedColor.g === 0 && appliedColor.b =
 const isWhite = appliedColor.r === 1 && appliedColor.g === 1 && appliedColor.b === 1;
 assert(isBlack || isWhite, 'fixContrast per-item apply should swap foreground to black or white');
 
+// ── Batch Auto-Fix: suggestKrdsName (Tier C-suggest) — per-item ONLY ──
+// KRDS/public-data term mapping is judgment-bearing and carries mistranslation
+// risk, so it MUST NEVER be applied by the AB batch path (tier filter already
+// excludes 'C-suggest'); it is applied ONLY via explicit per-item approval.
+// This block is the core safety-guard regression for Task 6.
+page.children = [];
+page.selection = [];
+figma.commitUndoCount = 0;
+
+const krdsNode = figma.createFrame();
+krdsNode.name = '로그인';
+page.appendChild(krdsNode);
+page.selection = [krdsNode];
+
+await figma.ui.onmessage({ type: 'command-collect-fixes', scope: 'selection', options: { scanLimit: 100 } });
+const krdsPreview = latestMessage('command-fixes-preview');
+const krdsItem = krdsPreview.items.find((it) => it.providerId === 'suggestKrdsName');
+assert(krdsItem, 'suggestKrdsName should propose a KRDS naming suggestion');
+assert(krdsItem.tier === 'C-suggest', 'KRDS suggestion must be tier C-suggest');
+assert(krdsPreview.counts.suggestion >= 1, 'preview counts should track suggestions separately');
+
+// Safety guard: AB batch must NEVER apply C-suggest (KRDS) renames
+const beforeName = krdsNode.name;
+await figma.ui.onmessage({ type: 'command-apply-fixes', tier: 'AB' });
+assert(krdsNode.name === beforeName, 'AB batch must NEVER apply C-suggest (KRDS) renames');
+
+// Per-item explicit apply is the only allowed path
+await figma.ui.onmessage({ type: 'command-apply-fixes', ids: [krdsItem.id] });
+assert(krdsNode.name !== beforeName, 'KRDS suggestion should apply only via explicit per-item approval');
+assert(krdsNode.name === 'login-area', 'KRDS provider should rename 로그인 → login-area');
+
 console.log('Mock Figma runtime smoke test passed.');

@@ -1342,6 +1342,13 @@ function commandGatherFixDescriptors(snapshot, nodes, colorVariables, queue) {
     var nd = nodes[n];
     var rawName = nd.name || '';
     var trimmed = commandTrimNodeName(rawName);
+    // "At most one name descriptor per node" convention:
+    //   trim (A) > rename (B) > KRDS suggestion (C-suggest).
+    // KRDS suggestion is judgment-bearing (mistranslation risk) so it lives in
+    // its own tier 'C-suggest' and is NEVER applied by the AB batch — only the
+    // trim/rename branches attach a name descriptor, KRDS attaches its own
+    // independent descriptor only when no trim/rename fired on this node.
+    var nameDescriptorAttached = false;
     if (trimmed !== rawName) {
       queue.push({
         id: commandNextFixId(), providerId: 'trimNodeName', tier: 'A',
@@ -1349,6 +1356,7 @@ function commandGatherFixDescriptors(snapshot, nodes, colorVariables, queue) {
         preview: { before: rawName, after: trimmed },
         payload: { nodeId: nd.id, nextName: trimmed },
       });
+      nameDescriptorAttached = true;
     // Rename only if no trim needed — avoids two descriptors for one node
     } else if (COMMAND_DEFAULT_NAME_RE.test(rawName)) {
       var suggested = commandSuggestSemanticName(nd);
@@ -1358,6 +1366,22 @@ function commandGatherFixDescriptors(snapshot, nodes, colorVariables, queue) {
         preview: { before: rawName, after: suggested },
         payload: { nodeId: nd.id, nextName: suggested },
       });
+      nameDescriptorAttached = true;
+    }
+    // KRDS suggestion: separate descriptor, tier 'C-suggest'. Attached only when
+    // no deterministic name fix (trim/rename) already claimed this node, so a
+    // single node never gets two competing name descriptors. Independent of the
+    // AB filter — always excluded from batch apply by its tier.
+    if (!nameDescriptorAttached) {
+      var krdsKey = Object.keys(COMMAND_KRDS_TERMS).filter(function (k) { return rawName.indexOf(k) >= 0; })[0];
+      if (krdsKey) {
+        queue.push({
+          id: commandNextFixId(), providerId: 'suggestKrdsName', tier: 'C-suggest',
+          label: 'KRDS 제안: "' + rawName + '" → "' + COMMAND_KRDS_TERMS[krdsKey] + '"',
+          preview: { before: rawName, after: COMMAND_KRDS_TERMS[krdsKey] },
+          payload: { nodeId: nd.id, nextName: COMMAND_KRDS_TERMS[krdsKey] },
+        });
+      }
     }
   }
   // 중복 색상값 토큰 통합
@@ -1507,6 +1531,23 @@ commandRegisterFixProvider('trimNodeName', 'A', async function (payload) {
 
 /* ── Provider: renameDefaultName (Tier B) ── */
 commandRegisterFixProvider('renameDefaultName', 'B', async function (payload) {
+  var node = await commandGetNodeById(payload.nodeId);
+  if (!node) return false;
+  node.name = payload.nextName;
+  return true;
+});
+
+/* ── Provider: suggestKrdsName (Tier C-suggest) — 항목별 승인 전용 ──
+   KRDS/공공데이터 용어 매핑은 판단형(judgment-bearing)이며 오역 위험이 있다.
+   잘못된 용어를 일괄 적용하면 파일 전체로 전파되므로, 절대 AB 일괄 경로로
+   적용되지 않도록 tier 'C-suggest' 로 분리한다. commandApplyFixes 의
+   tier:'AB' 필터(tier==='A'||tier==='B')가 자동 제외하며, 항목별
+   command-apply-fixes {ids:[...]} 로만 적용된다. */
+var COMMAND_KRDS_TERMS = {
+  '로그인': 'login-area', '검색': 'search-area', '목록': 'list-area',
+  '상세': 'detail-area', '신청': 'apply-area', '안내': 'guide-area',
+};
+commandRegisterFixProvider('suggestKrdsName', 'C-suggest', async function (payload) {
   var node = await commandGetNodeById(payload.nodeId);
   if (!node) return false;
   node.name = payload.nextName;
