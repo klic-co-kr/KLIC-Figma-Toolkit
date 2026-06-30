@@ -180,6 +180,12 @@ class Variable {
   setValueForMode(modeId, value) {
     this.valuesByMode[modeId] = value;
   }
+
+  remove() {
+    this.removed = true;
+    const idx = variables.indexOf(this);
+    if (idx >= 0) variables.splice(idx, 1);
+  }
 }
 
 const page = new PageNode();
@@ -784,5 +790,28 @@ assert(renameItem.tier === 'B', 'renameDefaultName is Tier B');
 await figma.ui.onmessage({ type: 'command-apply-fixes', tier: 'AB' });
 assert(trimNode.name === 'Spaced Name', 'trimNodeName should collapse whitespace');
 assert(defaultNode.name !== 'Rectangle 5', 'renameDefaultName should rename the default-named node');
+
+// ── Batch Auto-Fix: consolidateDuplicateToken (Tier B) ──
+// Canonical has shorter name, duplicate has longer name (heuristic: shorter = canonical)
+page.children = [];
+page.selection = [];
+figma.commitUndoCount = 0;
+const canonicalVar = figma.variables.createVariable('Blue', collections[0], 'COLOR');
+canonicalVar.valuesByMode[collections[0].defaultModeId] = { r: 0.1, g: 0.3, b: 0.9 };
+const dupVar = figma.variables.createVariable('Blue/Duplicate', collections[0], 'COLOR');
+dupVar.valuesByMode[collections[0].defaultModeId] = { r: 0.1, g: 0.3, b: 0.9 };
+const dupBoundRect = figma.createRectangle();
+dupBoundRect.fills = [figma.variables.setBoundVariableForPaint({ type: 'SOLID', color: { r: 0.1, g: 0.3, b: 0.9 }, opacity: 1 }, 'color', dupVar)];
+page.appendChild(dupBoundRect);
+page.selection = [];
+
+await figma.ui.onmessage({ type: 'command-collect-fixes', scope: 'page', options: { scanLimit: 500 } });
+const dupPreview = latestMessage('command-fixes-preview');
+const dupItem = dupPreview.items.find((it) => it.providerId === 'consolidateDuplicateToken' && it.preview && it.preview.before.includes('Blue/Duplicate'));
+assert(dupItem, 'consolidateDuplicateToken should propose a fix for duplicate color values');
+
+await figma.ui.onmessage({ type: 'command-apply-fixes', tier: 'AB' });
+assert(dupBoundRect.fills[0].boundVariables.color.id === canonicalVar.id, 'consolidate should rebind node to the canonical variable BEFORE deleting duplicate');
+assert(dupVar.removed === true, 'consolidate should remove the duplicate variable after rebinding');
 
 console.log('Mock Figma runtime smoke test passed.');

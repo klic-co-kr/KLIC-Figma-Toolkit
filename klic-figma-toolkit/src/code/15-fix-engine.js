@@ -28,7 +28,8 @@ async function commandCollectFixes(msg) {
     var options = msg.options || {};
     var snapshot = await collectCommandSnapshot(scope, options);
     var nodes = commandLastScanNodes;
-    commandGatherFixDescriptors(snapshot, nodes, commandFixQueue);
+    var colorVariables = await commandGetLocalColorVariables();
+    commandGatherFixDescriptors(snapshot, nodes, colorVariables, commandFixQueue);
     figma.ui.postMessage({
       type: 'command-fixes-preview',
       counts: commandFixCounts(commandFixQueue),
@@ -47,8 +48,10 @@ function commandNextFixId() {
   return 'fix-' + commandFixIdSeq;
 }
 
-function commandGatherFixDescriptors(snapshot, nodes, queue) {
+function commandGatherFixDescriptors(snapshot, nodes, colorVariables, queue) {
   nodes = nodes || [];
+  queue = queue || [];
+  colorVariables = colorVariables || [];
   var previewItems = (snapshot && snapshot.previewItems) || [];
   for (var i = 0; i < previewItems.length; i++) {
     var item = previewItems[i];
@@ -91,7 +94,51 @@ function commandGatherFixDescriptors(snapshot, nodes, queue) {
       });
     }
   }
+  // 중복 색상값 토큰 통합
+  var byHex = {};
+  for (var c = 0; c < colorVariables.length; c++) {
+    var cv = colorVariables[c];
+    if (!cv.hex) continue;
+    (byHex[cv.hex] = byHex[cv.hex] || []).push(cv);
+  }
+  var boundRefs = commandFindBoundNodeRefs(nodes);
+  for (var hex in byHex) {
+    if (byHex[hex].length < 2) continue;
+    var group = byHex[hex].slice().sort(function (a, b) { return a.name.length - b.name.length; });
+    var canonical = group[0];
+    for (var d = 1; d < group.length; d++) {
+      var dup = group[d];
+      var dupRefs = boundRefs.filter(function (r) { return r.variableId === dup.id; });
+      if (dupRefs.length === 0) continue; // 바인딩된 노드 없으면 긴급 수정 불필요
+      queue.push({
+        id: commandNextFixId(), providerId: 'consolidateDuplicateToken', tier: 'B',
+        label: 'Merge "' + dup.name + '" → "' + canonical.name + '"',
+        preview: { before: dup.name + ' (' + hex + ')', after: canonical.name },
+        payload: {
+          duplicateVariableId: dup.id, canonicalVariableId: canonical.id,
+          boundNodeRefs: dupRefs,
+        },
+      });
+    }
+  }
   return queue;
+}
+
+function commandFindBoundNodeRefs(nodes) {
+  nodes = nodes || [];
+  var refs = [];
+  for (var i = 0; i < nodes.length; i++) {
+    var nd = nodes[i];
+    var fills = nd.fills;
+    if (!Array.isArray(fills)) continue;
+    for (var p = 0; p < fills.length; p++) {
+      var bv = fills[p].boundVariables;
+      if (bv && bv.color && bv.color.id) {
+        refs.push({ nodeId: nd.id, property: 'fills', paintIndex: p, variableId: bv.color.id });
+      }
+    }
+  }
+  return refs;
 }
 
 async function commandApplyFixes(msg) {
@@ -141,6 +188,25 @@ commandRegisterFixProvider('renameDefaultName', 'B', async function (payload) {
   var node = await commandGetNodeById(payload.nodeId);
   if (!node) return false;
   node.name = payload.nextName;
+  return true;
+});
+
+/* ── Provider: consolidateDuplicateToken (Tier B) ──
+   순서: 모든 바인딩 노드를 canonical 로 재바인딩 → 그 후 duplicate.remove()
+   재바인딩 실패 시 삭제하지 않음 (스펙 §10 안전 순서 강제) */
+commandRegisterFixProvider('consolidateDuplicateToken', 'B', async function (payload) {
+  var canonical = await commandGetVariableById(payload.canonicalVariableId);
+  var duplicate = await commandGetVariableById(payload.duplicateVariableId);
+  if (!canonical || !duplicate) return false;
+  var refs = payload.boundNodeRefs || [];
+  for (var i = 0; i < refs.length; i++) {
+    var ref = refs[i];
+    var ok = await commandApplySingleColorBinding({
+      nodeId: ref.nodeId, property: ref.property, paintIndex: ref.paintIndex, variableId: canonical.id,
+    });
+    if (!ok) return false; // 재바인딩 실패 시 삭제하지 않음 (안전)
+  }
+  if (typeof duplicate.remove === 'function') duplicate.remove();
   return true;
 });
 
