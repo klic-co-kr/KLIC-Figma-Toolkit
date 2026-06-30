@@ -180,6 +180,12 @@ class Variable {
   setValueForMode(modeId, value) {
     this.valuesByMode[modeId] = value;
   }
+
+  remove() {
+    this.removed = true;
+    const idx = variables.indexOf(this);
+    if (idx >= 0) variables.splice(idx, 1);
+  }
 }
 
 const page = new PageNode();
@@ -206,6 +212,10 @@ const figma = {
     },
   },
   showUI() {},
+  commitUndoCount: 0,
+  commitUndo() {
+    this.commitUndoCount++;
+  },
   createRectangle() {
     return new RectangleNode();
   },
@@ -726,5 +736,219 @@ assert(dtcgJson.color?.['KLIC Smoke Test']?.Smoke?.Primary?.$type === 'color', '
 assert(dtcgJson.color['KLIC Smoke Test'].Smoke.Primary.$value === '#12A0FB', 'DTCG JSON should preserve token hex value');
 assert(handoffJson.dtcg && handoffJson.dtcg.format === 'DTCG', 'handoff export JSON should reference DTCG payload metadata');
 assert(handoffExport.summary && handoffExport.summary.tokenCount === handoffJson.tokens.length, 'handoff export should include machine-readable summary');
+
+// ── Batch Auto-Fix: engine skeleton ──
+page.children = [];  // Clear all nodes to ensure empty fix queue
+page.selection = [];
+figma.commitUndoCount = 0;
+await figma.ui.onmessage({ type: 'command-collect-fixes', scope: 'page', options: { scanLimit: 500 } });
+const fixesPreview = latestMessage('command-fixes-preview');
+assert(fixesPreview, 'command-collect-fixes did not post command-fixes-preview');
+assert(typeof fixesPreview.counts === 'object', 'fixes preview should include counts object');
+
+await figma.ui.onmessage({ type: 'command-apply-fixes', tier: 'AB' });
+const fixesApplied = latestMessage('command-fixes-applied');
+assert(fixesApplied, 'command-apply-fixes did not post command-fixes-applied');
+assert(figma.commitUndoCount === 0, 'empty-queue apply must NOT push an undo entry (no work attempted)');
+
+// ── Batch Auto-Fix: bindRawColor (Tier A) ──
+const fixVar = figma.variables.createVariable('Fix/Primary', collections[0], 'COLOR');
+fixVar.valuesByMode[collections[0].defaultModeId] = { r: 0.2, g: 0.4, b: 0.8 };
+const rawRect = figma.createRectangle();
+rawRect.name = 'Raw Fill Rect';
+rawRect.fills = [{ type: 'SOLID', color: { r: 0.2, g: 0.4, b: 0.8 }, opacity: 1 }];
+page.appendChild(rawRect);
+page.selection = [rawRect];
+
+await figma.ui.onmessage({ type: 'command-collect-fixes', scope: 'selection', options: { scanLimit: 100 } });
+const bindPreview = latestMessage('command-fixes-preview');
+assert(bindPreview.counts.A >= 1, 'bindRawColor should contribute a Tier A fix for an exact-match raw color');
+const bindItem = bindPreview.items.find((it) => it.providerId === 'bindRawColor');
+assert(bindItem, 'preview should include a bindRawColor item');
+
+await figma.ui.onmessage({ type: 'command-apply-fixes', tier: 'AB' });
+assert(rawRect.fills[0].boundVariables && rawRect.fills[0].boundVariables.color, 'bindRawColor should bind the matching variable to the paint');
+
+// ── Batch Auto-Fix: name normalization (Tier A/B) ──
+const trimNode = figma.createFrame();
+trimNode.name = '  Spaced   Name  ';
+page.appendChild(trimNode);
+const defaultNode = figma.createRectangle();
+defaultNode.name = 'Rectangle 5';
+page.appendChild(defaultNode);
+page.selection = [trimNode, defaultNode];
+
+await figma.ui.onmessage({ type: 'command-collect-fixes', scope: 'selection', options: { scanLimit: 100 } });
+const namePreview = latestMessage('command-fixes-preview');
+const trimItem = namePreview.items.find((it) => it.providerId === 'trimNodeName');
+const renameItem = namePreview.items.find((it) => it.providerId === 'renameDefaultName');
+assert(trimItem, 'trimNodeName should propose a fix for a node with extra whitespace');
+assert(renameItem, 'renameDefaultName should propose a fix for a default-named node');
+assert(trimItem.tier === 'A', 'trimNodeName is Tier A');
+assert(renameItem.tier === 'B', 'renameDefaultName is Tier B');
+
+await figma.ui.onmessage({ type: 'command-apply-fixes', tier: 'AB' });
+assert(trimNode.name === 'Spaced Name', 'trimNodeName should collapse whitespace');
+assert(defaultNode.name !== 'Rectangle 5', 'renameDefaultName should rename the default-named node');
+
+// ── Batch Auto-Fix: consolidateDuplicateToken (Tier B) ──
+// v1 posture: rebind-only — do NOT remove() the duplicate (Task 8 spike pending).
+// Canonical has shorter name, duplicate has longer name (heuristic: shorter = canonical).
+// State reset: pop-loop so closures referencing `variables` see the cleared array.
+while (variables.length) variables.pop();
+page.children = [];
+page.selection = [];
+figma.commitUndoCount = 0;
+
+// Recreate the collection since we cleared variables (collections still intact).
+const canonicalVar = figma.variables.createVariable('Blue', collections[0], 'COLOR');
+canonicalVar.valuesByMode[collections[0].defaultModeId] = { r: 0.1, g: 0.3, b: 0.9 };
+const dupVar = figma.variables.createVariable('Blue/Duplicate', collections[0], 'COLOR');
+dupVar.valuesByMode[collections[0].defaultModeId] = { r: 0.1, g: 0.3, b: 0.9 };
+const dupBoundRect = figma.createRectangle();
+dupBoundRect.fills = [figma.variables.setBoundVariableForPaint({ type: 'SOLID', color: { r: 0.1, g: 0.3, b: 0.9 }, opacity: 1 }, 'color', dupVar)];
+page.appendChild(dupBoundRect);
+page.selection = [];
+
+await figma.ui.onmessage({ type: 'command-collect-fixes', scope: 'page', options: { scanLimit: 500 } });
+const dupPreview = latestMessage('command-fixes-preview');
+const dupItem = dupPreview.items.find((it) => it.providerId === 'consolidateDuplicateToken' && it.preview && it.preview.before.includes('Blue/Duplicate'));
+assert(dupItem, 'consolidateDuplicateToken should propose a fix for duplicate color values');
+
+await figma.ui.onmessage({ type: 'command-apply-fixes', tier: 'AB' });
+// v1: rebind must succeed — bound rect should point to canonical
+assert(dupBoundRect.fills[0].boundVariables.color.id === canonicalVar.id, 'consolidate should rebind node to the canonical variable');
+// v1: must NOT delete the duplicate — remove() is deferred to Task 8 spike
+assert(dupVar.removed !== true, 'v1 must NOT delete the duplicate variable — rebind only; remove manually via Figma variables panel');
+
+// ── Negative-path: rebind failure must not claim success and must not delete duplicate ──
+// Reset state for a clean negative-path scenario.
+while (variables.length) variables.pop();
+page.children = [];
+page.selection = [];
+figma.commitUndoCount = 0;
+
+const canon2 = figma.variables.createVariable('Red', collections[0], 'COLOR');
+canon2.valuesByMode[collections[0].defaultModeId] = { r: 0.9, g: 0.1, b: 0.1 };
+const dup2 = figma.variables.createVariable('Red/Duplicate', collections[0], 'COLOR');
+dup2.valuesByMode[collections[0].defaultModeId] = { r: 0.9, g: 0.1, b: 0.1 };
+const dup2BoundRect = figma.createRectangle();
+dup2BoundRect.fills = [figma.variables.setBoundVariableForPaint({ type: 'SOLID', color: { r: 0.9, g: 0.1, b: 0.1 }, opacity: 1 }, 'color', dup2)];
+page.appendChild(dup2BoundRect);
+page.selection = [];
+
+await figma.ui.onmessage({ type: 'command-collect-fixes', scope: 'page', options: { scanLimit: 500 } });
+const negPreview = latestMessage('command-fixes-preview');
+const negItem = negPreview.items.find((it) => it.providerId === 'consolidateDuplicateToken' && it.preview && it.preview.before.includes('Red/Duplicate'));
+assert(negItem, 'negative-path: consolidateDuplicateToken should propose a fix for the Red/Duplicate scenario');
+
+// Sabotage: remove the bound node from nodeMap so commandGetNodeById returns null → rebind returns false.
+nodeMap.delete(dup2BoundRect.id);
+
+const negApplyStart = postedMessages.length;
+await figma.ui.onmessage({ type: 'command-apply-fixes', ids: [negItem.id] });
+const negApplied = postedMessages.slice(negApplyStart).find((m) => m.type === 'command-fixes-applied');
+assert(negApplied, 'negative-path: command-apply-fixes should still post command-fixes-applied even on failure');
+assert(negApplied.applied === 0 && negApplied.skipped === 1, 'negative-path: provider should return false when rebind fails — applied=0, skipped=1');
+// v1 safety: even on failure, duplicate must not be deleted
+assert(dup2.removed !== true, 'negative-path: failed rebind must not delete the duplicate variable');
+
+// ── Batch Auto-Fix: Tier C per-item (fixTargetSize) ──
+// Tier C providers must NEVER be touched by the AB batch path (structural guard,
+// hardened by Task 6). This block verifies the C path end-to-end via fixTargetSize.
+page.children = [];
+page.selection = [];
+figma.commitUndoCount = 0;
+
+const smallBtn = figma.createFrame();
+smallBtn.name = 'Tiny Button';
+smallBtn.resize(24, 24);
+page.appendChild(smallBtn);
+page.selection = [smallBtn];
+
+await figma.ui.onmessage({ type: 'command-collect-fixes', scope: 'selection', options: { scanLimit: 100 } });
+const cPreview = latestMessage('command-fixes-preview');
+const sizeItem = cPreview.items.find((it) => it.providerId === 'fixTargetSize');
+assert(sizeItem, 'fixTargetSize should propose a Tier C fix for an undersized target');
+assert(sizeItem.tier === 'C', 'fixTargetSize is Tier C');
+
+// AB batch must NOT touch Tier C items (safety guard — Task 6 hardens further)
+await figma.ui.onmessage({ type: 'command-apply-fixes', tier: 'AB' });
+assert(smallBtn.width === 24, 'AB batch must NOT apply Tier C fixes');
+
+// Per-item apply
+await figma.ui.onmessage({ type: 'command-apply-fixes', ids: [sizeItem.id] });
+assert(smallBtn.width >= 44, 'fixTargetSize per-item apply should resize to >= 44px');
+assert(smallBtn.height >= 44, 'fixTargetSize per-item apply should resize height to >= 44px');
+
+// ── Batch Auto-Fix: Tier C per-item (fixContrast) ──
+// fixContrast swaps the foreground fill to whichever of black/white passes 4.5:1.
+// Background = white frame fill (set via parent), foreground = mid-gray text →
+// black must pass, white must not. Provider should pick black.
+page.children = [];
+page.selection = [];
+figma.commitUndoCount = 0;
+
+const contrastFrame = figma.createFrame();
+contrastFrame.name = 'Contrast Host';
+contrastFrame.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
+page.appendChild(contrastFrame);
+const lowText = figma.createText();
+lowText.name = 'Faint Text';
+lowText.characters = 'faint';
+lowText.fills = [{ type: 'SOLID', color: { r: 0.75, g: 0.75, b: 0.75 } }];
+contrastFrame.appendChild(lowText);
+page.selection = [lowText];
+
+await figma.ui.onmessage({ type: 'command-collect-fixes', scope: 'selection', options: { scanLimit: 100 } });
+const fcPreview = latestMessage('command-fixes-preview');
+const contrastItem = fcPreview.items.find((it) => it.providerId === 'fixContrast');
+assert(contrastItem, 'fixContrast should propose a Tier C fix for low-contrast text');
+assert(contrastItem.tier === 'C', 'fixContrast is Tier C');
+// preview.after exposes the chosen replacement color (human-readable) — white bg + mid-gray
+// text → black is the only color that passes 4.5:1, so the deterministic pick is #000000.
+assert(contrastItem.preview && contrastItem.preview.after === '#000000', 'fixContrast should choose #000000 against a white background');
+
+// AB batch must NOT touch Tier C
+await figma.ui.onmessage({ type: 'command-apply-fixes', tier: 'AB' });
+assert(lowText.fills[0].color.r === 0.75, 'AB batch must NOT apply Tier C fixContrast');
+
+// Per-item apply: foreground should now be the chosen black/white
+await figma.ui.onmessage({ type: 'command-apply-fixes', ids: [contrastItem.id] });
+const appliedColor = lowText.fills[0].color;
+const isBlack = appliedColor.r === 0 && appliedColor.g === 0 && appliedColor.b === 0;
+const isWhite = appliedColor.r === 1 && appliedColor.g === 1 && appliedColor.b === 1;
+assert(isBlack || isWhite, 'fixContrast per-item apply should swap foreground to black or white');
+
+// ── Batch Auto-Fix: suggestKrdsName (Tier C-suggest) — per-item ONLY ──
+// KRDS/public-data term mapping is judgment-bearing and carries mistranslation
+// risk, so it MUST NEVER be applied by the AB batch path (tier filter already
+// excludes 'C-suggest'); it is applied ONLY via explicit per-item approval.
+// This block is the core safety-guard regression for Task 6.
+page.children = [];
+page.selection = [];
+figma.commitUndoCount = 0;
+
+const krdsNode = figma.createFrame();
+krdsNode.name = '로그인';
+page.appendChild(krdsNode);
+page.selection = [krdsNode];
+
+await figma.ui.onmessage({ type: 'command-collect-fixes', scope: 'selection', options: { scanLimit: 100 } });
+const krdsPreview = latestMessage('command-fixes-preview');
+const krdsItem = krdsPreview.items.find((it) => it.providerId === 'suggestKrdsName');
+assert(krdsItem, 'suggestKrdsName should propose a KRDS naming suggestion');
+assert(krdsItem.tier === 'C-suggest', 'KRDS suggestion must be tier C-suggest');
+assert(krdsPreview.counts.suggestion >= 1, 'preview counts should track suggestions separately');
+
+// Safety guard: AB batch must NEVER apply C-suggest (KRDS) renames
+const beforeName = krdsNode.name;
+await figma.ui.onmessage({ type: 'command-apply-fixes', tier: 'AB' });
+assert(krdsNode.name === beforeName, 'AB batch must NEVER apply C-suggest (KRDS) renames');
+
+// Per-item explicit apply is the only allowed path
+await figma.ui.onmessage({ type: 'command-apply-fixes', ids: [krdsItem.id] });
+assert(krdsNode.name !== beforeName, 'KRDS suggestion should apply only via explicit per-item approval');
+assert(krdsNode.name === 'login-area', 'KRDS provider should rename 로그인 → login-area');
 
 console.log('Mock Figma runtime smoke test passed.');

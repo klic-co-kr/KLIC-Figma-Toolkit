@@ -405,6 +405,16 @@
   .input-group .row-in { display: flex; align-items: center; gap: 5px; }
   .input-group input[type="number"] { width: 64px; }
   .unit { font-size: 11px; color: #888; }
+
+  /* Command Center Auto-Fix section (Task 7) */
+  .fix-section { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid #303030; border-radius: 8px; margin-top: 8px; }
+  .fix-section h3 { margin: 0; font-size: 12px; font-weight: 600; color: #ddd; }
+  .fix-counts { display: flex; gap: 6px; flex-wrap: wrap; min-height: 12px; }
+  .fix-counts .chip { background: #202020; border-radius: 999px; padding: 3px 8px; font-size: 11px; color: #ddd; }
+  .fix-c-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .fix-c-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: #1b1b1b; border-radius: 6px; padding: 8px; font-size: 11px; color: #ddd; }
+  .fix-c-list li .fix-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fix-c-list li .btn { flex: 0 0 auto; padding: 3px 10px; font-size: 11px; }
 </style>
 </head>
 <body>
@@ -499,6 +509,13 @@
           <div class="side-chip" onclick="switchTool('style')" data-i18n="command.goStyle">Style binding</div>
           <div class="side-chip" onclick="switchTool('qa')" data-i18n="command.goQa">QA checks</div>
           <div class="side-chip" onclick="switchTool('handoff')" data-i18n="command.goHandoff">Handoff</div>
+          <section class="fix-section" id="fix-section">
+            <h3 data-i18n="command.fixTitle">Auto-Fix</h3>
+            <button class="btn" id="fix-scan" data-i18n="command.fixScan">Scan for fixes</button>
+            <div class="fix-counts" id="fix-counts"></div>
+            <button class="btn btn-primary" id="fix-batch-apply" data-i18n="command.fixBatchApply" disabled>Apply safe fixes (A+B)</button>
+            <ul class="fix-c-list" id="fix-c-list"></ul>
+          </section>
         </div>
       </div>
     </div>
@@ -946,6 +963,11 @@ const I18N = {
     'command.issueMatch': 'RGB exact and OKLCH suggestions will appear here after preview',
     'command.issueGenerated': 'KLIC generated nodes are tracked with plugin data',
     'command.bind': 'Bind',
+    'command.fixTitle': 'Auto-Fix',
+    'command.fixScan': 'Scan for fixes',
+    'command.fixBatchApply': 'Apply safe fixes (A+B)',
+    'command.fixApplyItem': 'Apply',
+    'command.fixApplied': (n) => `✅ ${n} fixes applied — Ctrl+Z to undo all`,
     'command.note': 'Command Center is the overview hub. Detailed work lives in Style, QA, and Handoff.',
     'command.inspector': 'Inspector',
     'command.goStyle': 'Style binding',
@@ -1159,6 +1181,11 @@ const I18N = {
     'command.issueMatch': '미리보기 후 RGB 정확 매칭과 OKLCH 추천이 표시됩니다',
     'command.issueGenerated': 'KLIC 생성 노드는 plugin data로 추적됩니다',
     'command.bind': '바인딩',
+    'command.fixTitle': '자동 수리',
+    'command.fixScan': '수리 항목 스캔',
+    'command.fixBatchApply': '안전 수리 일괄 적용 (A+B)',
+    'command.fixApplyItem': '적용',
+    'command.fixApplied': (n) => `✅ 수리 ${n}건 적용 — Ctrl+Z로 전체 취소`,
     'command.note': 'Command Center는 관제 허브입니다. 세부 작업은 Style, QA, Handoff에서 실행합니다.',
     'command.inspector': 'Inspector',
     'command.goStyle': '스타일 바인딩',
@@ -1850,6 +1877,52 @@ document.getElementById('command-export-tokens').addEventListener('click', comma
 document.getElementById('command-create-report-board').addEventListener('click', commandCreateReportBoard);
 document.getElementById('command-open-folder-maker').addEventListener('click', commandOpenFolderMaker);
 document.getElementById('command-project-type').addEventListener('change', (event) => commandApplyProjectPreset(event.target.value));
+
+/* ── Auto-Fix section (Task 7): scan + AB batch apply + per-item apply ──
+   Reuses the same scope/options helpers as commandRefresh so the fix engine
+   sees the identical scope (selection|page) and scan limits as a normal scan.
+   Status feedback flows through commandGetBindingList() — same surface every
+   other Command Center result uses (no separate setStatus helper exists). */
+document.getElementById('fix-scan').addEventListener('click', function () {
+  parent.postMessage({ pluginMessage: { type: 'command-collect-fixes', scope: commandScope, options: commandGetOptions() } }, '*');
+});
+document.getElementById('fix-batch-apply').addEventListener('click', function () {
+  parent.postMessage({ pluginMessage: { type: 'command-apply-fixes', tier: 'AB' } }, '*');
+});
+
+function commandRenderFixPreview(msg) {
+  const counts = msg.counts || {};
+  const countsEl = document.getElementById('fix-counts');
+  if (countsEl) countsEl.innerHTML = '';
+  ['A', 'B', 'C', 'suggestion'].forEach(function (k) {
+    if (!counts[k]) return;
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.textContent = k + ': ' + counts[k];
+    if (countsEl) countsEl.appendChild(chip);
+  });
+  const batchBtn = document.getElementById('fix-batch-apply');
+  if (batchBtn) batchBtn.disabled = !((counts.A || 0) + (counts.B || 0));
+
+  const list = document.getElementById('fix-c-list');
+  if (!list) return;
+  list.innerHTML = '';
+  (msg.items || []).filter(function (it) { return it.tier === 'C' || it.tier === 'C-suggest'; }).forEach(function (it) {
+    const li = document.createElement('li');
+    const label = document.createElement('span');
+    label.className = 'fix-label';
+    label.textContent = it.label;
+    const btn = document.createElement('button');
+    btn.className = 'btn';
+    btn.textContent = t('command.fixApplyItem');
+    btn.addEventListener('click', function () {
+      parent.postMessage({ pluginMessage: { type: 'command-apply-fixes', ids: [it.id] } }, '*');
+    });
+    li.appendChild(label);
+    li.appendChild(btn);
+    list.appendChild(li);
+  });
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    MODULE: MENU  (data stays Korean — DEFAULT_MENU)
@@ -3202,6 +3275,17 @@ window.onmessage = (event) => {
   if (msg.type === 'command-snapshot') {
     commandRenderSnapshot(msg.data);
     if (msg.data && msg.data.previewItems) commandRenderBindingPreview(msg.data.previewItems);
+    return;
+  }
+  if (msg.type === 'command-fixes-preview') {
+    commandRenderFixPreview(msg);
+    return;
+  }
+  if (msg.type === 'command-fixes-applied') {
+    const list = commandGetBindingList();
+    list.innerHTML = `<div class="hint">${t('command.fixApplied', msg.applied || 0)}</div>`;
+    // Re-scan so counts/chips reflect the post-apply state (mirrors command-refresh).
+    parent.postMessage({ pluginMessage: { type: 'command-collect-fixes', scope: commandScope, options: commandGetOptions() } }, '*');
     return;
   }
   if (msg.type === 'command-bindings-preview') {

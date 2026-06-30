@@ -23,6 +23,8 @@ figma.ui.onmessage = async function (msg) {
     case 'command-run-smoke-test':         return runCommandSmokeTest();
     case 'command-export-tokens':          return exportCommandTokens();
     case 'command-create-report-board':    return createCommandReportBoard(msg);
+    case 'command-collect-fixes':          return commandCollectFixes(msg);
+    case 'command-apply-fixes':            return commandApplyFixes(msg);
     case 'command-open-folder-maker':      return openFolderMaker();
 
     /* ── Table ── */

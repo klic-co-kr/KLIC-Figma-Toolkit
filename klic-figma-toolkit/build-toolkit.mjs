@@ -8,6 +8,7 @@ const repoRoot = path.resolve(root, '..');
 const codeSources = [
   'src/code/00-bootstrap.js',
   'src/code/10-command-center.js',
+  'src/code/15-fix-engine.js',
   'src/code/20-menu-generator.js',
   'src/code/30-style-guide.js',
   'src/code/40-table-builder.js',

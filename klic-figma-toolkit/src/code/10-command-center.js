@@ -5,6 +5,7 @@
 
 var KLIC_PLUGIN_DATA_KEY = 'klic.meta';
 var commandScanToken = 0;
+var commandLastScanNodes = [];
 
 function tagKlicNode(node, tool, meta) {
   if (!node || typeof node.setPluginData !== 'function') return;
@@ -518,6 +519,7 @@ async function collectCommandSnapshot(scope, options) {
   var token = ++commandScanToken;
   var scan = await commandGetScanNodes(scope || 'selection', options.scanLimit, token);
   var nodes = scan.nodes;
+  commandLastScanNodes = nodes;
   var variables = commandSortVariablesByPriority(await commandGetLocalColorVariables(), options.collectionPriority);
   var variablesByHex = {};
   variables.forEach(function (variable) {
