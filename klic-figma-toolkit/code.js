@@ -1378,8 +1378,8 @@ function commandGatherFixDescriptors(snapshot, nodes, colorVariables, queue) {
       if (dupRefs.length === 0) continue; // 바인딩된 노드 없으면 긴급 수정 불필요
       queue.push({
         id: commandNextFixId(), providerId: 'consolidateDuplicateToken', tier: 'B',
-        label: 'Merge "' + dup.name + '" → "' + canonical.name + '"',
-        preview: { before: dup.name + ' (' + hex + ')', after: canonical.name },
+        label: 'Rebind ' + dup.name + ' usage → ' + canonical.name + ' (duplicate kept; remove manually)',
+        preview: { before: dup.name + ' (' + hex + ')', after: canonical.name + ' [rebind only — duplicate variable kept for manual removal]' },
         payload: {
           duplicateVariableId: dup.id, canonicalVariableId: canonical.id,
           boundNodeRefs: dupRefs,
@@ -1395,14 +1395,27 @@ function commandFindBoundNodeRefs(nodes) {
   var refs = [];
   for (var i = 0; i < nodes.length; i++) {
     var nd = nodes[i];
+    // fills 스캔
     var fills = nd.fills;
-    if (!Array.isArray(fills)) continue;
-    for (var p = 0; p < fills.length; p++) {
-      var bv = fills[p].boundVariables;
-      if (bv && bv.color && bv.color.id) {
-        refs.push({ nodeId: nd.id, property: 'fills', paintIndex: p, variableId: bv.color.id });
+    if (Array.isArray(fills)) {
+      for (var p = 0; p < fills.length; p++) {
+        var bvF = fills[p].boundVariables;
+        if (bvF && bvF.color && bvF.color.id) {
+          refs.push({ nodeId: nd.id, property: 'fills', paintIndex: p, variableId: bvF.color.id });
+        }
       }
     }
+    // strokes 스캔 (fills 와 동일한 boundVariables.color.id 패턴)
+    var strokes = nd.strokes;
+    if (Array.isArray(strokes)) {
+      for (var s = 0; s < strokes.length; s++) {
+        var bvS = strokes[s].boundVariables;
+        if (bvS && bvS.color && bvS.color.id) {
+          refs.push({ nodeId: nd.id, property: 'strokes', paintIndex: s, variableId: bvS.color.id });
+        }
+      }
+    }
+    // effects 바인딩은 v1 범위 외 (구조가 fills/strokes 와 다름)
   }
   return refs;
 }
@@ -1458,8 +1471,16 @@ commandRegisterFixProvider('renameDefaultName', 'B', async function (payload) {
 });
 
 /* ── Provider: consolidateDuplicateToken (Tier B) ──
-   순서: 모든 바인딩 노드를 canonical 로 재바인딩 → 그 후 duplicate.remove()
-   재바인딩 실패 시 삭제하지 않음 (스펙 §10 안전 순서 강제) */
+   v1 안전 방침 (스펙 §10):
+   - variable.remove() 안전성은 실제 Figma 환경에서 미검증 (Task 8 spike 대기 중).
+   - fills 외에 strokes 바인딩은 탐지하지만 effects 등 기타 속성은 v1 범위 외.
+   - 바인딩된 노드가 strokes 등 아직 완전히 탐지되지 않은 곳에 있을 수 있으므로
+     중복 변수를 삭제하면 데이터 손실 위험이 있음.
+   따라서 v1은 다음 동작만 수행:
+     1. 탐지된 boundNodeRefs 의 모든 노드를 canonical 변수로 재바인딩.
+     2. 재바인딩이 하나라도 실패하면 즉시 false 반환 (아무것도 커밋하지 않음).
+     3. 중복 변수는 삭제하지 않음 — 사용자가 Figma 변수 패널에서 수동으로 제거할 것.
+   remove() 재활성화는 Task 8 spike 에서 실제 Figma 환경 안전성 확인 후 수행. */
 commandRegisterFixProvider('consolidateDuplicateToken', 'B', async function (payload) {
   var canonical = await commandGetVariableById(payload.canonicalVariableId);
   var duplicate = await commandGetVariableById(payload.duplicateVariableId);
@@ -1470,9 +1491,10 @@ commandRegisterFixProvider('consolidateDuplicateToken', 'B', async function (pay
     var ok = await commandApplySingleColorBinding({
       nodeId: ref.nodeId, property: ref.property, paintIndex: ref.paintIndex, variableId: canonical.id,
     });
-    if (!ok) return false; // 재바인딩 실패 시 삭제하지 않음 (안전)
+    if (!ok) return false; // 재바인딩 실패 시 중단 — 변수 삭제 절대 금지 (안전)
   }
-  if (typeof duplicate.remove === 'function') duplicate.remove();
+  // NOTE: duplicate.remove() 는 의도적으로 호출하지 않음.
+  // Task 8 spike 완료 전까지 중복 변수는 보존. 사용자가 수동으로 정리할 것.
   return true;
 });
 

@@ -792,10 +792,15 @@ assert(trimNode.name === 'Spaced Name', 'trimNodeName should collapse whitespace
 assert(defaultNode.name !== 'Rectangle 5', 'renameDefaultName should rename the default-named node');
 
 // ── Batch Auto-Fix: consolidateDuplicateToken (Tier B) ──
-// Canonical has shorter name, duplicate has longer name (heuristic: shorter = canonical)
+// v1 posture: rebind-only — do NOT remove() the duplicate (Task 8 spike pending).
+// Canonical has shorter name, duplicate has longer name (heuristic: shorter = canonical).
+// State reset: pop-loop so closures referencing `variables` see the cleared array.
+while (variables.length) variables.pop();
 page.children = [];
 page.selection = [];
 figma.commitUndoCount = 0;
+
+// Recreate the collection since we cleared variables (collections still intact).
 const canonicalVar = figma.variables.createVariable('Blue', collections[0], 'COLOR');
 canonicalVar.valuesByMode[collections[0].defaultModeId] = { r: 0.1, g: 0.3, b: 0.9 };
 const dupVar = figma.variables.createVariable('Blue/Duplicate', collections[0], 'COLOR');
@@ -811,7 +816,41 @@ const dupItem = dupPreview.items.find((it) => it.providerId === 'consolidateDupl
 assert(dupItem, 'consolidateDuplicateToken should propose a fix for duplicate color values');
 
 await figma.ui.onmessage({ type: 'command-apply-fixes', tier: 'AB' });
-assert(dupBoundRect.fills[0].boundVariables.color.id === canonicalVar.id, 'consolidate should rebind node to the canonical variable BEFORE deleting duplicate');
-assert(dupVar.removed === true, 'consolidate should remove the duplicate variable after rebinding');
+// v1: rebind must succeed — bound rect should point to canonical
+assert(dupBoundRect.fills[0].boundVariables.color.id === canonicalVar.id, 'consolidate should rebind node to the canonical variable');
+// v1: must NOT delete the duplicate — remove() is deferred to Task 8 spike
+assert(dupVar.removed !== true, 'v1 must NOT delete the duplicate variable — rebind only; remove manually via Figma variables panel');
+
+// ── Negative-path: rebind failure must not claim success and must not delete duplicate ──
+// Reset state for a clean negative-path scenario.
+while (variables.length) variables.pop();
+page.children = [];
+page.selection = [];
+figma.commitUndoCount = 0;
+
+const canon2 = figma.variables.createVariable('Red', collections[0], 'COLOR');
+canon2.valuesByMode[collections[0].defaultModeId] = { r: 0.9, g: 0.1, b: 0.1 };
+const dup2 = figma.variables.createVariable('Red/Duplicate', collections[0], 'COLOR');
+dup2.valuesByMode[collections[0].defaultModeId] = { r: 0.9, g: 0.1, b: 0.1 };
+const dup2BoundRect = figma.createRectangle();
+dup2BoundRect.fills = [figma.variables.setBoundVariableForPaint({ type: 'SOLID', color: { r: 0.9, g: 0.1, b: 0.1 }, opacity: 1 }, 'color', dup2)];
+page.appendChild(dup2BoundRect);
+page.selection = [];
+
+await figma.ui.onmessage({ type: 'command-collect-fixes', scope: 'page', options: { scanLimit: 500 } });
+const negPreview = latestMessage('command-fixes-preview');
+const negItem = negPreview.items.find((it) => it.providerId === 'consolidateDuplicateToken' && it.preview && it.preview.before.includes('Red/Duplicate'));
+assert(negItem, 'negative-path: consolidateDuplicateToken should propose a fix for the Red/Duplicate scenario');
+
+// Sabotage: remove the bound node from nodeMap so commandGetNodeById returns null → rebind returns false.
+nodeMap.delete(dup2BoundRect.id);
+
+const negApplyStart = postedMessages.length;
+await figma.ui.onmessage({ type: 'command-apply-fixes', ids: [negItem.id] });
+const negApplied = postedMessages.slice(negApplyStart).find((m) => m.type === 'command-fixes-applied');
+assert(negApplied, 'negative-path: command-apply-fixes should still post command-fixes-applied even on failure');
+assert(negApplied.applied === 0 && negApplied.skipped === 1, 'negative-path: provider should return false when rebind fails — applied=0, skipped=1');
+// v1 safety: even on failure, duplicate must not be deleted
+assert(dup2.removed !== true, 'negative-path: failed rebind must not delete the duplicate variable');
 
 console.log('Mock Figma runtime smoke test passed.');
