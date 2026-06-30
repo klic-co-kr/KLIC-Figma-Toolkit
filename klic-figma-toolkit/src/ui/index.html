@@ -98,6 +98,13 @@
           <div class="side-chip" onclick="switchTool('style')" data-i18n="command.goStyle">Style binding</div>
           <div class="side-chip" onclick="switchTool('qa')" data-i18n="command.goQa">QA checks</div>
           <div class="side-chip" onclick="switchTool('handoff')" data-i18n="command.goHandoff">Handoff</div>
+          <section class="fix-section" id="fix-section">
+            <h3 data-i18n="command.fixTitle">Auto-Fix</h3>
+            <button class="btn" id="fix-scan" data-i18n="command.fixScan">Scan for fixes</button>
+            <div class="fix-counts" id="fix-counts"></div>
+            <button class="btn btn-primary" id="fix-batch-apply" data-i18n="command.fixBatchApply" disabled>Apply safe fixes (A+B)</button>
+            <ul class="fix-c-list" id="fix-c-list"></ul>
+          </section>
         </div>
       </div>
     </div>

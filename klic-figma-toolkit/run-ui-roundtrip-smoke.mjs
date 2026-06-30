@@ -263,6 +263,14 @@ assert(commandPaneHtml, 'Command Center pane markup should be extractable');
 assert(!commandPaneHtml.includes('id="command-kwcag-krds-audit"'), 'Command Center should not own KWCAG/KRDS audit controls');
 assert(!commandPaneHtml.includes('id="command-export-tokens"'), 'Command Center should not own handoff export controls');
 assert(ui.includes('value="public-education" selected'), 'public/education preset should be the default project type');
+// Command Center Auto-Fix section (Task 7): scan trigger, preview handler, batch + per-item apply
+assert(ui.includes('command-collect-fixes'), 'ui.html is missing Fix scan trigger');
+assert(ui.includes('command-fixes-preview'), 'ui.html is missing fixes preview handler');
+assert(ui.includes('command-apply-fixes'), 'ui.html is missing fixes apply trigger');
+assert(ui.includes('id="fix-batch-apply"'), 'ui.html is missing AB batch apply button');
+assert(ui.includes('id="fix-scan"'), 'ui.html is missing Fix scan button');
+assert(ui.includes('id="fix-c-list"'), 'ui.html is missing per-item C fix list');
+assert(ui.includes("'command.fixBatchApply'") || ui.includes('command.fixBatchApply'), 'i18n missing fix batch label');
 assert(ui.includes("data-i18n=\"command.pipelineTitle\""), 'Project Pipeline title should be localized');
 assert(script.includes("commandApplyProjectPreset('public-education')"), 'public/education preset should be applied during UI initialization');
 

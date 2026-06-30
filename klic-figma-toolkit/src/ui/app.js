@@ -541,6 +541,52 @@ document.getElementById('command-create-report-board').addEventListener('click',
 document.getElementById('command-open-folder-maker').addEventListener('click', commandOpenFolderMaker);
 document.getElementById('command-project-type').addEventListener('change', (event) => commandApplyProjectPreset(event.target.value));
 
+/* ── Auto-Fix section (Task 7): scan + AB batch apply + per-item apply ──
+   Reuses the same scope/options helpers as commandRefresh so the fix engine
+   sees the identical scope (selection|page) and scan limits as a normal scan.
+   Status feedback flows through commandGetBindingList() — same surface every
+   other Command Center result uses (no separate setStatus helper exists). */
+document.getElementById('fix-scan').addEventListener('click', function () {
+  parent.postMessage({ pluginMessage: { type: 'command-collect-fixes', scope: commandScope, options: commandGetOptions() } }, '*');
+});
+document.getElementById('fix-batch-apply').addEventListener('click', function () {
+  parent.postMessage({ pluginMessage: { type: 'command-apply-fixes', tier: 'AB' } }, '*');
+});
+
+function commandRenderFixPreview(msg) {
+  const counts = msg.counts || {};
+  const countsEl = document.getElementById('fix-counts');
+  if (countsEl) countsEl.innerHTML = '';
+  ['A', 'B', 'C', 'suggestion'].forEach(function (k) {
+    if (!counts[k]) return;
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.textContent = k + ': ' + counts[k];
+    if (countsEl) countsEl.appendChild(chip);
+  });
+  const batchBtn = document.getElementById('fix-batch-apply');
+  if (batchBtn) batchBtn.disabled = !((counts.A || 0) + (counts.B || 0));
+
+  const list = document.getElementById('fix-c-list');
+  if (!list) return;
+  list.innerHTML = '';
+  (msg.items || []).filter(function (it) { return it.tier === 'C' || it.tier === 'C-suggest'; }).forEach(function (it) {
+    const li = document.createElement('li');
+    const label = document.createElement('span');
+    label.className = 'fix-label';
+    label.textContent = it.label;
+    const btn = document.createElement('button');
+    btn.className = 'btn';
+    btn.textContent = t('command.fixApplyItem');
+    btn.addEventListener('click', function () {
+      parent.postMessage({ pluginMessage: { type: 'command-apply-fixes', ids: [it.id] } }, '*');
+    });
+    li.appendChild(label);
+    li.appendChild(btn);
+    list.appendChild(li);
+  });
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    MODULE: MENU  (data stays Korean — DEFAULT_MENU)
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -1892,6 +1938,17 @@ window.onmessage = (event) => {
   if (msg.type === 'command-snapshot') {
     commandRenderSnapshot(msg.data);
     if (msg.data && msg.data.previewItems) commandRenderBindingPreview(msg.data.previewItems);
+    return;
+  }
+  if (msg.type === 'command-fixes-preview') {
+    commandRenderFixPreview(msg);
+    return;
+  }
+  if (msg.type === 'command-fixes-applied') {
+    const list = commandGetBindingList();
+    list.innerHTML = `<div class="hint">${t('command.fixApplied', msg.applied || 0)}</div>`;
+    // Re-scan so counts/chips reflect the post-apply state (mirrors command-refresh).
+    parent.postMessage({ pluginMessage: { type: 'command-collect-fixes', scope: commandScope, options: commandGetOptions() } }, '*');
     return;
   }
   if (msg.type === 'command-bindings-preview') {
