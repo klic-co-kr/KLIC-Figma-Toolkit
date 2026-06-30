@@ -27,10 +27,7 @@ async function commandCollectFixes(msg) {
     var scope = msg.scope || 'selection';
     var options = msg.options || {};
     var snapshot = await collectCommandSnapshot(scope, options);
-    var token = ++commandScanToken;
-    var scanLimit = Math.max(50, Math.min(10000, parseInt(options.scanLimit, 10) || 2000));
-    var scan = await commandGetScanNodes(scope, scanLimit, token);
-    var nodes = scan.nodes || [];
+    var nodes = commandLastScanNodes;
     commandGatherFixDescriptors(snapshot, nodes, commandFixQueue);
     figma.ui.postMessage({
       type: 'command-fixes-preview',
@@ -83,6 +80,7 @@ function commandGatherFixDescriptors(snapshot, nodes, queue) {
         preview: { before: rawName, after: trimmed },
         payload: { nodeId: nd.id, nextName: trimmed },
       });
+    // Rename only if no trim needed — avoids two descriptors for one node
     } else if (COMMAND_DEFAULT_NAME_RE.test(rawName)) {
       var suggested = commandSuggestSemanticName(nd);
       queue.push({
