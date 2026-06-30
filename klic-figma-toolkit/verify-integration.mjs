@@ -179,6 +179,8 @@ const expectedPluginMessages = [
   'command-run-smoke-test',
   'command-export-tokens',
   'command-create-report-board',
+  'command-collect-fixes',
+  'command-apply-fixes',
   'menu-generate',
   'menu-register-template',
   'style-create-variables',
@@ -222,6 +224,8 @@ const expectedUiMessages = [
   'table-variables',
   'table-done',
   'table-error',
+  'command-fixes-preview',
+  'command-fixes-applied',
 ];
 
 for (const type of expectedUiMessages) {
@@ -263,6 +267,10 @@ for (const fnName of [
   'createSelectComponents',
   'createBadgeComponents',
   'createTableComponent',
+  'commandRegisterFixProvider',
+  'commandCollectFixes',
+  'commandApplyFixes',
+  'commandGatherFixDescriptors',
 ]) {
   assert(code.includes(`function ${fnName}`), `code.js is missing ${fnName}`);
 }
@@ -597,5 +605,16 @@ assert(
   contentRows.some((row) => row.name === '시행령' && row.path === '직무발명제도란? > 관련 발명진흥법 및 시행령 > 시행령'),
   'sample CSV fill-down path for 시행령 is incorrect',
 );
+
+assert(code.includes("commandRegisterFixProvider('bindRawColor'"), 'bindRawColor provider not registered');
+assert(code.includes("commandRegisterFixProvider('renameDefaultName'"), 'renameDefaultName provider not registered');
+assert(code.includes("commandRegisterFixProvider('consolidateDuplicateToken'"), 'consolidateDuplicateToken provider not registered');
+assert(code.includes("commandRegisterFixProvider('suggestKrdsName'"), 'suggestKrdsName provider not registered');
+assert(code.includes('figma.commitUndo'), 'fix apply path must call figma.commitUndo');
+assert(ui.includes('command-collect-fixes') && ui.includes('fix-batch-apply'), 'ui missing fix controls');
+for (const key of ['command.fixTitle', 'command.fixScan', 'command.fixBatchApply', 'command.fixApplyItem', 'command.fixApplied']) {
+  assert(enI18n.includes(`'${key}'`), `en i18n missing ${key}`);
+  assert(koI18n.includes(`'${key}'`), `ko i18n missing ${key}`);
+}
 
 console.log('KLIC Figma Toolkit integration check passed.');
