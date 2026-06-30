@@ -763,4 +763,26 @@ assert(bindItem, 'preview should include a bindRawColor item');
 await figma.ui.onmessage({ type: 'command-apply-fixes', tier: 'AB' });
 assert(rawRect.fills[0].boundVariables && rawRect.fills[0].boundVariables.color, 'bindRawColor should bind the matching variable to the paint');
 
+// ── Batch Auto-Fix: name normalization (Tier A/B) ──
+const trimNode = figma.createFrame();
+trimNode.name = '  Spaced   Name  ';
+page.appendChild(trimNode);
+const defaultNode = figma.createRectangle();
+defaultNode.name = 'Rectangle 5';
+page.appendChild(defaultNode);
+page.selection = [trimNode, defaultNode];
+
+await figma.ui.onmessage({ type: 'command-collect-fixes', scope: 'selection', options: { scanLimit: 100 } });
+const namePreview = latestMessage('command-fixes-preview');
+const trimItem = namePreview.items.find((it) => it.providerId === 'trimNodeName');
+const renameItem = namePreview.items.find((it) => it.providerId === 'renameDefaultName');
+assert(trimItem, 'trimNodeName should propose a fix for a node with extra whitespace');
+assert(renameItem, 'renameDefaultName should propose a fix for a default-named node');
+assert(trimItem.tier === 'A', 'trimNodeName is Tier A');
+assert(renameItem.tier === 'B', 'renameDefaultName is Tier B');
+
+await figma.ui.onmessage({ type: 'command-apply-fixes', tier: 'AB' });
+assert(trimNode.name === 'Spaced Name', 'trimNodeName should collapse whitespace');
+assert(defaultNode.name !== 'Rectangle 5', 'renameDefaultName should rename the default-named node');
+
 console.log('Mock Figma runtime smoke test passed.');

@@ -1288,8 +1288,14 @@ function commandFixCounts(queue) {
 async function commandCollectFixes(msg) {
   try {
     commandFixQueue = [];
-    var snapshot = await collectCommandSnapshot(msg.scope || 'selection', msg.options || {});
-    commandGatherFixDescriptors(snapshot, commandFixQueue);
+    var scope = msg.scope || 'selection';
+    var options = msg.options || {};
+    var snapshot = await collectCommandSnapshot(scope, options);
+    var token = ++commandScanToken;
+    var scanLimit = Math.max(50, Math.min(10000, parseInt(options.scanLimit, 10) || 2000));
+    var scan = await commandGetScanNodes(scope, scanLimit, token);
+    var nodes = scan.nodes || [];
+    commandGatherFixDescriptors(snapshot, nodes, commandFixQueue);
     figma.ui.postMessage({
       type: 'command-fixes-preview',
       counts: commandFixCounts(commandFixQueue),
@@ -1308,7 +1314,8 @@ function commandNextFixId() {
   return 'fix-' + commandFixIdSeq;
 }
 
-function commandGatherFixDescriptors(snapshot, queue) {
+function commandGatherFixDescriptors(snapshot, nodes, queue) {
+  nodes = nodes || [];
   var previewItems = (snapshot && snapshot.previewItems) || [];
   for (var i = 0; i < previewItems.length; i++) {
     var item = previewItems[i];
@@ -1326,6 +1333,27 @@ function commandGatherFixDescriptors(snapshot, queue) {
           variableId: item.variableId,
           matchType: item.matchType,
         },
+      });
+    }
+  }
+  for (var n = 0; n < nodes.length; n++) {
+    var nd = nodes[n];
+    var rawName = nd.name || '';
+    var trimmed = commandTrimNodeName(rawName);
+    if (trimmed !== rawName) {
+      queue.push({
+        id: commandNextFixId(), providerId: 'trimNodeName', tier: 'A',
+        label: 'Trim "' + rawName + '"',
+        preview: { before: rawName, after: trimmed },
+        payload: { nodeId: nd.id, nextName: trimmed },
+      });
+    } else if (COMMAND_DEFAULT_NAME_RE.test(rawName)) {
+      var suggested = commandSuggestSemanticName(nd);
+      queue.push({
+        id: commandNextFixId(), providerId: 'renameDefaultName', tier: 'B',
+        label: 'Rename "' + rawName + '" → "' + suggested + '"',
+        preview: { before: rawName, after: suggested },
+        payload: { nodeId: nd.id, nextName: suggested },
       });
     }
   }
@@ -1365,6 +1393,40 @@ async function commandApplyFixes(msg) {
 commandRegisterFixProvider('bindRawColor', 'A', async function (payload) {
   return await commandApplySingleColorBinding(payload);
 });
+
+/* ── Provider: trimNodeName (Tier A) ── */
+commandRegisterFixProvider('trimNodeName', 'A', async function (payload) {
+  var node = await commandGetNodeById(payload.nodeId);
+  if (!node) return false;
+  node.name = payload.nextName;
+  return true;
+});
+
+/* ── Provider: renameDefaultName (Tier B) ── */
+commandRegisterFixProvider('renameDefaultName', 'B', async function (payload) {
+  var node = await commandGetNodeById(payload.nodeId);
+  if (!node) return false;
+  node.name = payload.nextName;
+  return true;
+});
+
+var COMMAND_DEFAULT_NAME_RE = /^(Frame|Rectangle|Ellipse|Group|Vector|Line|Text|Component|Slice|Star|Polygon) \d+$/;
+
+function commandTrimNodeName(name) {
+  return name.replace(/\s+/g, ' ').replace(/^ | $/g, '');
+}
+
+function commandSuggestSemanticName(node) {
+  // 자식 텍스트가 있으면 그 내용을, 없으면 타입 기반 의미명
+  if (node.children) {
+    for (var i = 0; i < node.children.length; i++) {
+      if (node.children[i].type === 'TEXT' && node.children[i].characters) {
+        return commandTrimNodeName(node.children[i].characters).slice(0, 40) || node.type;
+      }
+    }
+  }
+  return node.type + ' (renamed)';
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    MODULE: MENU PAGE GENERATOR
