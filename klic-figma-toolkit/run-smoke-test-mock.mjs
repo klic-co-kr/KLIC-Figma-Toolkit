@@ -732,6 +732,8 @@ assert(handoffJson.dtcg && handoffJson.dtcg.format === 'DTCG', 'handoff export J
 assert(handoffExport.summary && handoffExport.summary.tokenCount === handoffJson.tokens.length, 'handoff export should include machine-readable summary');
 
 // ── Batch Auto-Fix: engine skeleton ──
+page.children = [];  // Clear all nodes to ensure empty fix queue
+page.selection = [];
 figma.commitUndoCount = 0;
 await figma.ui.onmessage({ type: 'command-collect-fixes', scope: 'page', options: { scanLimit: 500 } });
 const fixesPreview = latestMessage('command-fixes-preview');
@@ -741,7 +743,7 @@ assert(typeof fixesPreview.counts === 'object', 'fixes preview should include co
 await figma.ui.onmessage({ type: 'command-apply-fixes', tier: 'AB' });
 const fixesApplied = latestMessage('command-fixes-applied');
 assert(fixesApplied, 'command-apply-fixes did not post command-fixes-applied');
-assert(figma.commitUndoCount >= 1, 'apply-fixes must call figma.commitUndo so users can undo fixes');
+assert(figma.commitUndoCount === 0, 'empty-queue apply must NOT push an undo entry (no work attempted)');
 
 // ── Batch Auto-Fix: bindRawColor (Tier A) ──
 const fixVar = figma.variables.createVariable('Fix/Primary', collections[0], 'COLOR');

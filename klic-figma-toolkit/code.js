@@ -1324,7 +1324,7 @@ function commandGatherFixDescriptors(snapshot, queue) {
           property: item.property,
           paintIndex: item.paintIndex,
           variableId: item.variableId,
-          matchType: 'rgb-exact',
+          matchType: item.matchType,
         },
       });
     }
@@ -1335,6 +1335,7 @@ function commandGatherFixDescriptors(snapshot, queue) {
 async function commandApplyFixes(msg) {
   var applied = 0;
   var skipped = 0;
+  var attempted = false;
   try {
     var targets = [];
     if (msg.tier === 'AB') {
@@ -1345,6 +1346,7 @@ async function commandApplyFixes(msg) {
       targets = commandFixQueue.filter(function (item) { return idSet[item.id]; });
     }
     for (var i = 0; i < targets.length; i++) {
+      attempted = true;
       var item = targets[i];
       var provider = commandFixProviders[item.providerId];
       if (!provider) { skipped++; continue; }
@@ -1355,7 +1357,7 @@ async function commandApplyFixes(msg) {
   } catch (err) {
     figma.ui.postMessage({ type: 'command-error', message: err.message || String(err) });
   } finally {
-    figma.commitUndo();
+    if (attempted) figma.commitUndo();
   }
 }
 
