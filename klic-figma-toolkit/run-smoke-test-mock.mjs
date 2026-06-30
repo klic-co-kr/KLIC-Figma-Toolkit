@@ -853,4 +853,71 @@ assert(negApplied.applied === 0 && negApplied.skipped === 1, 'negative-path: pro
 // v1 safety: even on failure, duplicate must not be deleted
 assert(dup2.removed !== true, 'negative-path: failed rebind must not delete the duplicate variable');
 
+// ── Batch Auto-Fix: Tier C per-item (fixTargetSize) ──
+// Tier C providers must NEVER be touched by the AB batch path (structural guard,
+// hardened by Task 6). This block verifies the C path end-to-end via fixTargetSize.
+page.children = [];
+page.selection = [];
+figma.commitUndoCount = 0;
+
+const smallBtn = figma.createFrame();
+smallBtn.name = 'Tiny Button';
+smallBtn.resize(24, 24);
+page.appendChild(smallBtn);
+page.selection = [smallBtn];
+
+await figma.ui.onmessage({ type: 'command-collect-fixes', scope: 'selection', options: { scanLimit: 100 } });
+const cPreview = latestMessage('command-fixes-preview');
+const sizeItem = cPreview.items.find((it) => it.providerId === 'fixTargetSize');
+assert(sizeItem, 'fixTargetSize should propose a Tier C fix for an undersized target');
+assert(sizeItem.tier === 'C', 'fixTargetSize is Tier C');
+
+// AB batch must NOT touch Tier C items (safety guard — Task 6 hardens further)
+await figma.ui.onmessage({ type: 'command-apply-fixes', tier: 'AB' });
+assert(smallBtn.width === 24, 'AB batch must NOT apply Tier C fixes');
+
+// Per-item apply
+await figma.ui.onmessage({ type: 'command-apply-fixes', ids: [sizeItem.id] });
+assert(smallBtn.width >= 44, 'fixTargetSize per-item apply should resize to >= 44px');
+assert(smallBtn.height >= 44, 'fixTargetSize per-item apply should resize height to >= 44px');
+
+// ── Batch Auto-Fix: Tier C per-item (fixContrast) ──
+// fixContrast swaps the foreground fill to whichever of black/white passes 4.5:1.
+// Background = white frame fill (set via parent), foreground = mid-gray text →
+// black must pass, white must not. Provider should pick black.
+page.children = [];
+page.selection = [];
+figma.commitUndoCount = 0;
+
+const contrastFrame = figma.createFrame();
+contrastFrame.name = 'Contrast Host';
+contrastFrame.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
+page.appendChild(contrastFrame);
+const lowText = figma.createText();
+lowText.name = 'Faint Text';
+lowText.characters = 'faint';
+lowText.fills = [{ type: 'SOLID', color: { r: 0.75, g: 0.75, b: 0.75 } }];
+contrastFrame.appendChild(lowText);
+page.selection = [lowText];
+
+await figma.ui.onmessage({ type: 'command-collect-fixes', scope: 'selection', options: { scanLimit: 100 } });
+const fcPreview = latestMessage('command-fixes-preview');
+const contrastItem = fcPreview.items.find((it) => it.providerId === 'fixContrast');
+assert(contrastItem, 'fixContrast should propose a Tier C fix for low-contrast text');
+assert(contrastItem.tier === 'C', 'fixContrast is Tier C');
+// preview.after exposes the chosen replacement color (human-readable) — white bg + mid-gray
+// text → black is the only color that passes 4.5:1, so the deterministic pick is #000000.
+assert(contrastItem.preview && contrastItem.preview.after === '#000000', 'fixContrast should choose #000000 against a white background');
+
+// AB batch must NOT touch Tier C
+await figma.ui.onmessage({ type: 'command-apply-fixes', tier: 'AB' });
+assert(lowText.fills[0].color.r === 0.75, 'AB batch must NOT apply Tier C fixContrast');
+
+// Per-item apply: foreground should now be the chosen black/white
+await figma.ui.onmessage({ type: 'command-apply-fixes', ids: [contrastItem.id] });
+const appliedColor = lowText.fills[0].color;
+const isBlack = appliedColor.r === 0 && appliedColor.g === 0 && appliedColor.b === 0;
+const isWhite = appliedColor.r === 1 && appliedColor.g === 1 && appliedColor.b === 1;
+assert(isBlack || isWhite, 'fixContrast per-item apply should swap foreground to black or white');
+
 console.log('Mock Figma runtime smoke test passed.');

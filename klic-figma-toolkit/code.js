@@ -1387,6 +1387,49 @@ function commandGatherFixDescriptors(snapshot, nodes, colorVariables, queue) {
       });
     }
   }
+  // ── Tier C: 타깃 크기 (fixTargetSize) ──
+  // commandIsLikelyInteractiveNode + width/height < 44 → resize 제안.
+  for (var t = 0; t < nodes.length; t++) {
+    var tn = nodes[t];
+    if (typeof tn.width !== 'number' || typeof tn.height !== 'number') continue;
+    if (!commandIsLikelyInteractiveNode(tn)) continue;
+    if (tn.width >= COMMAND_MIN_TARGET && tn.height >= COMMAND_MIN_TARGET) continue;
+    queue.push({
+      id: commandNextFixId(), providerId: 'fixTargetSize', tier: 'C',
+      label: 'Resize "' + (tn.name || tn.id) + '" → ' + COMMAND_MIN_TARGET + 'px+',
+      preview: { before: Math.round(tn.width) + '×' + Math.round(tn.height), after: '≥' + COMMAND_MIN_TARGET + 'px' },
+      payload: { nodeId: tn.id },
+    });
+  }
+
+  // ── Tier C: 텍스트 대비 (fixContrast) ──
+  // snapshot 이 KWCAG 감사 결과를 노출하지 않으므로 (collectCommandSnapshot 는 색상 바인딩
+  // 미리보기만 생성) nodes 에서 직접 저대비 텍스트를 도출한다 — runKwcagKrdsAudit 와 동일 알고리즘,
+  // 동일 헬퍼(commandSolidPaintColor·commandFindBackgroundColor·commandContrastRatio) 재사용.
+  // 전경을 흑/백 중 4.5:1 통과 쪽으로 교체할 수 있을 때만 디스크립터 부착.
+  for (var f = 0; f < nodes.length; f++) {
+    var fn = nodes[f];
+    if (fn.type !== 'TEXT') continue;
+    var fg = commandSolidPaintColor(fn.fills);
+    if (!fg) continue;
+    var bg = commandFindBackgroundColor(fn);
+    var fgRatio = commandContrastRatio(fg, bg);
+    if (fgRatio >= COMMAND_TEXT_CONTRAST_MIN) continue; // 이미 통과
+    var chosen = commandChooseContrastColor(bg);
+    if (!chosen) continue; // 흑/백 어느 쪽도 통과 못 함 — 자동 수정 불가
+    var cpIndex = -1;
+    for (var pi = 0; pi < fn.fills.length; pi++) {
+      if (fn.fills[pi] && fn.fills[pi].type === 'SOLID' && fn.fills[pi].visible !== false) { cpIndex = pi; break; }
+    }
+    if (cpIndex < 0) continue;
+    queue.push({
+      id: commandNextFixId(), providerId: 'fixContrast', tier: 'C',
+      label: 'Fix contrast "' + (fn.name || fn.id) + '" → ' + commandRoundRatio(fgRatio) + ':1 → ≥' + COMMAND_TEXT_CONTRAST_MIN + ':1',
+      preview: { before: commandColorToHex(fg) + ' on ' + commandColorToHex(bg), after: (chosen === COMMAND_BLACK ? '#000000' : '#FFFFFF') },
+      payload: { nodeId: fn.id, paintIndex: cpIndex, nextColor: chosen },
+    });
+  }
+
   return queue;
 }
 
@@ -1497,6 +1540,52 @@ commandRegisterFixProvider('consolidateDuplicateToken', 'B', async function (pay
   // Task 8 spike 완료 전까지 중복 변수는 보존. 사용자가 수동으로 정리할 것.
   return true;
 });
+
+/* ── Provider: fixTargetSize (Tier C) ──
+   KRDS 최소 터치 타깃 44px. 보수적 v1: 양 축을 max(current, 44) 로 키운다. */
+var COMMAND_MIN_TARGET = 44;
+commandRegisterFixProvider('fixTargetSize', 'C', async function (payload) {
+  var node = await commandGetNodeById(payload.nodeId);
+  if (!node || typeof node.resize !== 'function') return false;
+  var nextW = Math.max(typeof node.width === 'number' ? node.width : COMMAND_MIN_TARGET, COMMAND_MIN_TARGET);
+  var nextH = Math.max(typeof node.height === 'number' ? node.height : COMMAND_MIN_TARGET, COMMAND_MIN_TARGET);
+  node.resize(nextW, nextH);
+  return true;
+});
+
+/* ── Provider: fixContrast (Tier C) ──
+   보수적/결정적 근사 (스펙 §10): 전경을 검정 또는 흰색 중 4.5:1 을 통과하는 쪽으로 교체.
+   둘 다 통과하면 더 높은 대비 쪽을 선택 (결정적·예측 가능).
+   payload.nextColor 는 {r,g,b} (0..1). */
+commandRegisterFixProvider('fixContrast', 'C', async function (payload) {
+  var node = await commandGetNodeById(payload.nodeId);
+  if (!node || !Array.isArray(node.fills)) return false;
+  var idx = typeof payload.paintIndex === 'number' ? payload.paintIndex : 0;
+  var next = node.fills.slice();
+  if (!next[idx] || next[idx].type !== 'SOLID') return false;
+  next[idx] = Object.assign({}, next[idx], { color: payload.nextColor });
+  node.fills = next;
+  return true;
+});
+
+/* fixContrast 보조: 배경 대비 통과하는 흑/백을 선택. 둘 다 통과 시 더 높은 대비 쪽 (결정적).
+   4.5:1 미충족 시 null 반환 (fix 제안 불가). */
+var COMMAND_TEXT_CONTRAST_MIN = 4.5;
+var COMMAND_BLACK = { r: 0, g: 0, b: 0 };
+var COMMAND_WHITE = { r: 1, g: 1, b: 1 };
+function commandChooseContrastColor(background) {
+  if (!background) return null;
+  var blackRatio = commandContrastRatio(COMMAND_BLACK, background);
+  var whiteRatio = commandContrastRatio(COMMAND_WHITE, background);
+  var blackPass = blackRatio >= COMMAND_TEXT_CONTRAST_MIN;
+  var whitePass = whiteRatio >= COMMAND_TEXT_CONTRAST_MIN;
+  if (!blackPass && !whitePass) return null; // 어느 쪽도 통과 못 함 — 자동 수정 불가
+  if (blackPass && whitePass) {
+    // 둘 다 통과 — 결정적 선택: 더 높은 대비 쪽
+    return blackRatio >= whiteRatio ? COMMAND_BLACK : COMMAND_WHITE;
+  }
+  return blackPass ? COMMAND_BLACK : COMMAND_WHITE;
+}
 
 var COMMAND_DEFAULT_NAME_RE = /^(Frame|Rectangle|Ellipse|Group|Vector|Line|Text|Component|Slice|Star|Polygon) \d+$/;
 
