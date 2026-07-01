@@ -42,7 +42,8 @@ figma.ui.onmessage = async function (msg) {
     case 'style-search-fonts':      return searchFonts(msg.query);
 
     /* ── Design QA ── */
-    case 'qa-rasterize-request': return qaRasterizeSelection(msg);
+    case 'qa-rasterize-request':    return qaRasterizeSelection(msg);
+    case 'qa-commit-board':         return qaCommitBoard(msg);
 
     /* ── Shared ── */
     case 'cancel':            return figma.closePlugin();

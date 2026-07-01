@@ -972,6 +972,14 @@ await figma.ui.onmessage({ type: 'qa-rasterize-request' });
 var qaPageErr = latestMessage('qa-rasterize-result');
 assert(qaPageErr && qaPageErr.error === 'page-not-allowed', 'qa-rasterize should reject PageNode selection');
 
+var qaText = figma.createText();
+qaText.characters = 'hi';
+page.appendChild(qaText);
+page.selection = [qaText];
+await figma.ui.onmessage({ type: 'qa-rasterize-request' });
+var qaTypeErr = latestMessage('qa-rasterize-result');
+assert(qaTypeErr && qaTypeErr.error === 'unsupported-type', 'qa-rasterize should reject unsupported node types');
+
 var qaDesignFrame = figma.createFrame();
 qaDesignFrame.name = 'Design Source';
 qaDesignFrame.resize(320, 200);
@@ -986,5 +994,40 @@ var qaMapped = vm.runInContext('qaMapNormalized(0.5, 200)', context);
 assert(qaMapped === 100, 'qaMapNormalized(0.5, 200) should be 100');
 var qaClamped = vm.runInContext('qaMapNormalized(1.4, 100)', context);
 assert(qaClamped === 100, 'qaMapNormalized should clamp >1 to size');
+
+// ── Design QA Diff: commit board ──
+var qaImplBytes = new Uint8Array([10, 20, 30, 40]);
+var qaLabels = [
+  { id: 'l1', x: 0.25, y: 0.5, w: 0.2, h: 0.1, note: 'wrong color', category: 'color' },
+  { id: 'l2', x: 0.6, y: 0.2, w: 0.15, h: 0.05, note: '', category: 'spacing' },
+];
+await figma.ui.onmessage({
+  type: 'qa-commit-board',
+  designNodeId: qaDesignFrame.id,
+  designW: 320, designH: 200,
+  implBytes: qaImplBytes, implW: 320, implH: 200,
+  labels: qaLabels,
+});
+var qaCommitted = latestMessage('qa-commit-result');
+assert(qaCommitted && qaCommitted.boardId, 'qa-commit-board should create a board');
+assert(qaCommitted.labelCount === 2, 'qa-commit-board should echo label count');
+var qaBoard = figma.getNodeById(qaCommitted.boardId);
+assert(qaBoard && qaBoard.name === 'KLIC Design QA Diff', 'qa board should be created and named');
+var qaMeta = JSON.parse(qaBoard.getPluginData('klic.meta'));
+assert(qaMeta.tool === 'qa-diff', 'qa board should be tagged qa-diff');
+assert(qaMeta.labelCount === 2 && qaMeta.categories.join(',') === 'color,spacing', 'qa board pluginData should persist label meta');
+var qaBoxes = qaBoard.findAll(function (n) { return n.type === 'RECTANGLE' && /QA Label/.test(n.name); });
+assert(qaBoxes.length === 2, 'qa board should render one rectangle per label');
+
+nodeMap.delete(qaDesignFrame.id);
+await figma.ui.onmessage({
+  type: 'qa-commit-board',
+  designNodeId: qaDesignFrame.id,
+  designW: 320, designH: 200,
+  implBytes: qaImplBytes, implW: 320, implH: 200,
+  labels: qaLabels,
+});
+var qaUnreachable = latestMessage('qa-commit-result');
+assert(qaUnreachable && qaUnreachable.error === 'design-unreachable', 'qa-commit should report design-unreachable when the design node is gone');
 
 console.log('Mock Figma runtime smoke test passed.');

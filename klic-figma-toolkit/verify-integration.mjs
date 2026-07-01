@@ -272,6 +272,7 @@ for (const fnName of [
   'commandApplyFixes',
   'commandGatherFixDescriptors',
   'qaRasterizeSelection',
+  'qaCommitBoard',
 ]) {
   assert(code.includes(`function ${fnName}`), `code.js is missing ${fnName}`);
 }
