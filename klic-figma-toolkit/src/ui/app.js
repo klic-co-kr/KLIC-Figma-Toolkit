@@ -2190,7 +2190,7 @@ function qaInitOverlay() {
   const canvas = document.getElementById('qa-label-overlay');
   const img = document.getElementById('qa-impl-img');
   const stage = document.getElementById('qa-impl-stage');
-  const scope = (evt) => qaImpl && img.naturalWidth;
+  const scope = () => qaImpl && img.naturalWidth;
   function pos(evt) {
     const r = canvas.getBoundingClientRect();
     return { x: Math.max(0, Math.min(r.width, evt.clientX - r.left)), y: Math.max(0, Math.min(r.height, evt.clientY - r.top)) };
@@ -2248,7 +2248,13 @@ function qaRenderRasterResult(msg) {
   const hint = document.getElementById('qa-design-hint');
   const img = document.getElementById('qa-design-img');
   if (msg.error) {
-    hint.textContent = t('designqa.noDesign');
+    if (msg.error === 'encode-failed') {
+      hint.textContent = t('designqa.errEncodeFailed');
+    } else if (msg.error === 'no-selection' || msg.error === 'page-not-allowed' || msg.error === 'unsupported-type') {
+      hint.textContent = t('designqa.noDesign');
+    } else {
+      hint.textContent = t('designqa.errDefault');
+    }
     return;
   }
   qaDesign = { bytes: msg.bytes, width: msg.width, height: msg.height, nodeId: msg.nodeId };
