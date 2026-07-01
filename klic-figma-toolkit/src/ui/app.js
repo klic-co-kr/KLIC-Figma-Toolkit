@@ -69,7 +69,7 @@ function resizeUi(size) {
    Tool tab switching
    ═══════════════════════════════════════════════════════════════════════════ */
 function switchTool(tool) {
-  ['command', 'menu', 'style', 'table', 'qa', 'handoff'].forEach(k => {
+  ['command', 'menu', 'style', 'table', 'qa', 'handoff', 'designqa'].forEach(k => {
     document.getElementById('tool-' + k).classList.toggle('active', tool === k);
     document.getElementById('pane-' + k).classList.toggle('active', tool === k);
   });
@@ -2089,6 +2089,16 @@ window.onmessage = (event) => {
     el.className = 'result error'; el.style.display = 'block';
     return;
   }
+
+  /* ── Design QA Diff ── */
+  if (msg.type === 'qa-rasterize-result') {
+    qaRenderRasterResult(msg);
+    return;
+  }
+  if (msg.type === 'qa-commit-result') {
+    qaRenderCommitResult(msg);
+    return;
+  }
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2098,3 +2108,200 @@ tableBuildColorRows();
 TABLE_COLOR_KEYS.forEach(k => tableUpdateSwatch(k));
 commandApplyProjectPreset('public-education');
 applyLang();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODULE: DESIGN QA DIFF
+   ═══════════════════════════════════════════════════════════════════════════ */
+let qaDesign = null;        // { bytes:Uint8Array, width, height, nodeId }
+let qaImpl = null;          // { bytes:Uint8Array, width, height }
+let qaLabels = [];
+let qaDrawing = null;       // active drag { x0,y0,x1,y1 } in display px
+
+const QA_CATEGORIES = ['color', 'spacing', 'typography', 'missing', 'extra', 'alignment', 'other'];
+
+function qaNormalizeRect(rect, dispW, dispH) {
+  return {
+    x: Math.max(0, Math.min(1, rect.x / dispW)),
+    y: Math.max(0, Math.min(1, rect.y / dispH)),
+    w: Math.max(0, Math.min(1, rect.w / dispW)),
+    h: Math.max(0, Math.min(1, rect.h / dispH)),
+  };
+}
+
+function qaBytesToObjectUrl(bytes) {
+  const blob = new Blob([bytes], { type: 'image/png' });
+  return URL.createObjectURL(blob);
+}
+
+function qaRenderLabels() {
+  const list = document.getElementById('qa-label-list');
+  list.innerHTML = '';
+  qaLabels.forEach((label, i) => {
+    const row = document.createElement('div');
+    row.className = 'fix-c-item';
+    const num = document.createElement('strong');
+    num.textContent = (i + 1) + '. ';
+    const note = document.createElement('input');
+    note.type = 'text'; note.className = 'grow'; note.value = label.note || '';
+    note.setAttribute('data-i18n-ph', 'designqa.notePh');
+    note.placeholder = t('designqa.notePh');
+    note.addEventListener('input', () => { label.note = note.value; });
+    const cat = document.createElement('select');
+    cat.className = 'col-select';
+    QA_CATEGORIES.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c; o.textContent = t('designqa.cat.' + c);
+      if (label.category === c) o.selected = true;
+      cat.appendChild(o);
+    });
+    cat.addEventListener('change', () => { label.category = cat.value; });
+    const del = document.createElement('button');
+    del.className = 'link-btn'; del.textContent = '×';
+    del.title = 'Remove';
+    del.addEventListener('click', () => { qaLabels.splice(i, 1); qaRedrawOverlay(); qaRenderLabels(); });
+    row.appendChild(num); row.appendChild(note); row.appendChild(cat); row.appendChild(del);
+    list.appendChild(row);
+  });
+}
+
+function qaRedrawOverlay() {
+  const canvas = document.getElementById('qa-label-overlay');
+  const img = document.getElementById('qa-impl-img');
+  if (!img.naturalWidth) return;
+  const dispW = img.clientWidth, dispH = img.clientHeight;
+  canvas.width = dispW; canvas.height = dispH;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, dispW, dispH);
+  const colors = ['#E63636', '#2563EB', '#16A34A', '#9333EA', '#D97706', '#0891B2', '#525252'];
+  qaLabels.forEach((label, i) => {
+    const x = label.x * dispW, y = label.y * dispH, w = label.w * dispW, h = label.h * dispH;
+    ctx.strokeStyle = colors[i % colors.length];
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, w, h);
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fillRect(x, y - 16, 24, 16);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 12px Inter, sans-serif';
+    ctx.fillText(String(i + 1), x + 4, y - 4);
+  });
+}
+
+function qaInitOverlay() {
+  const canvas = document.getElementById('qa-label-overlay');
+  const img = document.getElementById('qa-impl-img');
+  const stage = document.getElementById('qa-impl-stage');
+  const scope = (evt) => qaImpl && img.naturalWidth;
+  function pos(evt) {
+    const r = canvas.getBoundingClientRect();
+    return { x: Math.max(0, Math.min(r.width, evt.clientX - r.left)), y: Math.max(0, Math.min(r.height, evt.clientY - r.top)) };
+  }
+  canvas.addEventListener('mousedown', (evt) => {
+    if (!scope(evt)) return;
+    qaDrawing = { ...pos(evt) };
+  });
+  window.addEventListener('mousemove', (evt) => {
+    if (!qaDrawing) return;
+    const p = pos(evt);
+    const ctx = canvas.getContext('2d');
+    qaRedrawOverlay();
+    ctx.strokeStyle = '#E63636'; ctx.lineWidth = 2;
+    const x = Math.min(qaDrawing.x, p.x), y = Math.min(qaDrawing.y, p.y), w = Math.abs(p.x - qaDrawing.x), h = Math.abs(p.y - qaDrawing.y);
+    ctx.strokeRect(x, y, w, h);
+  });
+  window.addEventListener('mouseup', (evt) => {
+    if (!qaDrawing) return;
+    const p = pos(evt);
+    const r = canvas.getBoundingClientRect();
+    const x = Math.min(qaDrawing.x, p.x), y = Math.min(qaDrawing.y, p.y), w = Math.abs(p.x - qaDrawing.x), h = Math.abs(p.y - qaDrawing.y);
+    qaDrawing = null;
+    if (w < 6 || h < 6) return;
+    const norm = qaNormalizeRect({ x, y, w, h }, r.width, r.height);
+    qaLabels.push({ id: 'l' + Date.now(), x: norm.x, y: norm.y, w: norm.w, h: norm.h, note: '', category: 'other' });
+    qaRedrawOverlay();
+    qaRenderLabels();
+  });
+  img.addEventListener('load', qaRedrawOverlay);
+  window.addEventListener('resize', qaRedrawOverlay);
+  stage.addEventListener('dragover', (e) => e.preventDefault());
+  stage.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (file) qaLoadImplFile(file);
+  });
+}
+
+function qaLoadImplFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  file.arrayBuffer().then((buf) => {
+    const bytes = new Uint8Array(buf);
+    const url = qaBytesToObjectUrl(bytes);
+    const img = document.getElementById('qa-impl-img');
+    img.onload = () => {
+      qaImpl = { bytes, width: img.naturalWidth, height: img.naturalHeight };
+      qaRedrawOverlay();
+    };
+    img.src = url;
+  });
+}
+
+function qaRenderRasterResult(msg) {
+  const hint = document.getElementById('qa-design-hint');
+  const img = document.getElementById('qa-design-img');
+  if (msg.error) {
+    hint.textContent = t('designqa.noDesign');
+    return;
+  }
+  qaDesign = { bytes: msg.bytes, width: msg.width, height: msg.height, nodeId: msg.nodeId };
+  img.src = qaBytesToObjectUrl(msg.bytes);
+  hint.textContent = msg.width + ' × ' + msg.height;
+}
+
+function qaRenderCommitResult(msg) {
+  const result = document.getElementById('qa-result');
+  if (msg.error === 'design-unreachable') {
+    result.textContent = t('designqa.errDesignUnreachable');
+  } else if (msg.error) {
+    result.textContent = t('designqa.errDefault');
+  } else {
+    result.textContent = t('designqa.committed') + ' (' + (msg.labelCount || 0) + ')';
+    qaLabels = [];
+    qaRenderLabels();
+    qaRedrawOverlay();
+  }
+}
+
+document.getElementById('qa-capture').addEventListener('click', () => {
+  parent.postMessage({ pluginMessage: { type: 'qa-rasterize-request' } }, '*');
+});
+document.getElementById('qa-impl-file').addEventListener('change', (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (file) qaLoadImplFile(file);
+});
+const qaUrlInput = document.getElementById('qa-url');
+qaUrlInput.addEventListener('change', () => {
+  const frame = document.getElementById('qa-url-frame');
+  const blocked = document.getElementById('qa-url-blocked');
+  const url = qaUrlInput.value.trim();
+  if (!url) { frame.style.display = 'none'; blocked.style.display = 'none'; return; }
+  frame.style.display = 'block';
+  blocked.style.display = 'none';
+  frame.onload = () => { blocked.style.display = 'none'; };
+  frame.onerror = () => { blocked.style.display = 'block'; };
+  frame.src = url;
+});
+document.getElementById('qa-commit').addEventListener('click', () => {
+  const result = document.getElementById('qa-result');
+  if (!qaDesign) { result.textContent = t('designqa.noDesign'); return; }
+  if (!qaImpl) { result.textContent = t('designqa.noImpl'); return; }
+  parent.postMessage({
+    pluginMessage: {
+      type: 'qa-commit-board',
+      designNodeId: qaDesign.nodeId,
+      designW: qaDesign.width, designH: qaDesign.height,
+      implBytes: qaImpl.bytes, implW: qaImpl.width, implH: qaImpl.height,
+      labels: qaLabels.map(l => ({ id: l.id, x: l.x, y: l.y, w: l.w, h: l.h, note: l.note, category: l.category })),
+    },
+  }, '*');
+  result.textContent = '';
+});
+qaInitOverlay();

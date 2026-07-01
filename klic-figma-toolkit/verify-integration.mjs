@@ -189,6 +189,8 @@ const expectedPluginMessages = [
   'style-search-fonts',
   'table-ready',
   'table-generate',
+  'qa-rasterize-request',
+  'qa-commit-board',
 ];
 
 for (const type of expectedPluginMessages) {
@@ -226,6 +228,8 @@ const expectedUiMessages = [
   'table-error',
   'command-fixes-preview',
   'command-fixes-applied',
+  'qa-rasterize-result',
+  'qa-commit-result',
 ];
 
 for (const type of expectedUiMessages) {

@@ -415,6 +415,14 @@
   .fix-c-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: #1b1b1b; border-radius: 6px; padding: 8px; font-size: 11px; color: #ddd; }
   .fix-c-list li .fix-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fix-c-list li .btn { flex: 0 0 auto; padding: 3px 10px; font-size: 11px; }
+
+/* ── Design QA Diff ── */
+.qa-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.qa-col { display: flex; flex-direction: column; gap: 6px; }
+.qa-preview { max-width: 100%; border: 1px solid #2a2a2a; border-radius: 6px; background: #111; }
+.qa-impl-stage { position: relative; display: inline-block; }
+.qa-overlay { position: absolute; inset: 0; cursor: crosshair; }
+.qa-url-frame { width: 100%; height: 180px; border: 1px solid #2a2a2a; border-radius: 6px; }
 </style>
 </head>
 <body>
@@ -444,6 +452,7 @@
     <button class="tool-tab"        id="tool-table"  onclick="switchTool('table')"  data-i18n="tool.table">Table Builder</button>
     <button class="tool-tab"        id="tool-qa"     onclick="switchTool('qa')"     data-i18n="tool.qa">QA</button>
     <button class="tool-tab"        id="tool-handoff" onclick="switchTool('handoff')" data-i18n="tool.handoff">Handoff</button>
+    <button class="tool-tab" id="tool-designqa" onclick="switchTool('designqa')" data-i18n="tool.designqa">Design QA</button>
   </div>
 
   <!-- ════════════════════════════════════════════════════════════════════
@@ -893,12 +902,60 @@
     </div>
   </div>
 
+  <!-- PANE: DESIGN QA DIFF -->
+  <div class="tool-pane" id="pane-designqa">
+    <div>
+      <div class="panel-title" data-i18n="designqa.title">Design QA Diff</div>
+      <div class="panel-desc" data-i18n="designqa.desc">Capture the design and the implemented page, label the differences, commit to canvas.</div>
+    </div>
+
+    <div class="workspace-panel">
+      <div class="workspace-actions">
+        <button class="btn" id="qa-capture" data-i18n="designqa.rasterize">Capture selected frame</button>
+      </div>
+
+      <div class="qa-columns">
+        <div class="qa-col">
+          <div class="section-label" data-i18n="designqa.designPrev">Design (selected frame)</div>
+          <img id="qa-design-img" class="qa-preview" alt="">
+          <div class="hint" id="qa-design-hint" data-i18n="designqa.noDesign">Select a frame and capture it first.</div>
+        </div>
+        <div class="qa-col">
+          <div class="section-label" data-i18n="designqa.implPrev">Implementation</div>
+          <div class="qa-impl-stage" id="qa-impl-stage">
+            <img id="qa-impl-img" class="qa-preview" alt="">
+            <canvas id="qa-label-overlay" class="qa-overlay"></canvas>
+          </div>
+          <label class="file-label">
+            <span data-i18n="designqa.implUpload">Upload implementation screenshot</span>
+            <input type="file" accept="image/*" id="qa-impl-file" style="display:none">
+          </label>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:8px">
+        <input type="text" class="grow" id="qa-url" data-i18n-ph="designqa.urlPh">
+      </div>
+      <div class="hint" data-i18n="designqa.urlNote">Live URL is reference only — cross-origin pages cannot be auto-captured.</div>
+      <iframe id="qa-url-frame" class="qa-url-frame" style="display:none"></iframe>
+      <div class="hint" id="qa-url-blocked" style="display:none" data-i18n="designqa.urlBlocked">This site blocks embedding. Use manual upload.</div>
+
+      <div class="hint" style="margin-top:8px" data-i18n="designqa.labelHint">Drag on the implementation image to label a difference.</div>
+      <div class="binding-list" id="qa-label-list"></div>
+
+      <div class="workspace-actions" style="margin-top:8px">
+        <button class="btn btn-primary" id="qa-commit" data-i18n="designqa.commit">Commit to canvas</button>
+      </div>
+      <div class="result" id="qa-result"></div>
+    </div>
+  </div>
+
 </div>
 
 <script>
 const I18N = {
   en: {
-    'tool.command': 'Command Center', 'tool.menu': 'Menu Page', 'tool.style': 'Style Guide', 'tool.table': 'Table Builder', 'tool.qa': 'QA', 'tool.handoff': 'Handoff',
+    'tool.command': 'Command Center', 'tool.menu': 'Menu Page', 'tool.style': 'Style Guide', 'tool.table': 'Table Builder', 'tool.qa': 'QA', 'tool.handoff': 'Handoff', 'tool.designqa': 'Design QA',
     'common.close': 'Close',
     'ui.sizeCompact': 'Compact panel',
     'ui.sizeDefault': 'Default panel',
@@ -1114,9 +1171,36 @@ const I18N = {
     'table.errPrefix': 'Error: ',
     'table.colorLabels': { border: 'Border', headerBg: 'Header BG', footerBg: 'Footer BG', altBg: 'Alt row', cellBg: 'Cell' },
     'table.directInput': 'Direct input',
+    'designqa.title': 'Design QA Diff',
+    'designqa.desc': 'Capture the design and the implemented page, label the differences, commit to canvas.',
+    'designqa.rasterize': 'Capture selected frame',
+    'designqa.designPrev': 'Design (selected frame)',
+    'designqa.implPrev': 'Implementation',
+    'designqa.implUpload': 'Upload implementation screenshot',
+    'designqa.urlPh': 'https://example.com — live URL (reference only)',
+    'designqa.urlNote': 'Live URL is reference only — cross-origin pages cannot be auto-captured.',
+    'designqa.urlBlocked': 'This site blocks embedding. Use manual upload.',
+    'designqa.labelHint': 'Drag on the implementation image to label a difference.',
+    'designqa.notePh': 'Describe the difference',
+    'designqa.category': 'Category',
+    'designqa.cat.color': 'Color',
+    'designqa.cat.spacing': 'Spacing',
+    'designqa.cat.typography': 'Typography',
+    'designqa.cat.missing': 'Missing',
+    'designqa.cat.extra': 'Extra',
+    'designqa.cat.alignment': 'Alignment',
+    'designqa.cat.other': 'Other',
+    'designqa.labels': 'Labels',
+    'designqa.commit': 'Commit to canvas',
+    'designqa.noDesign': 'Select a frame and capture it first.',
+    'designqa.noImpl': 'Upload an implementation screenshot first.',
+    'designqa.committed': 'Board created.',
+    'designqa.errEncodeFailed': 'Capture failed. See Figma notification.',
+    'designqa.errDesignUnreachable': 'Design frame was not found. Re-capture and try again.',
+    'designqa.errDefault': 'Something went wrong. See Figma notification.',
   },
   ko: {
-    'tool.command': 'Command Center', 'tool.menu': '메뉴 페이지', 'tool.style': '스타일 가이드', 'tool.table': '테이블 빌더', 'tool.qa': 'QA', 'tool.handoff': '핸드오프',
+    'tool.command': 'Command Center', 'tool.menu': '메뉴 페이지', 'tool.style': '스타일 가이드', 'tool.table': '테이블 빌더', 'tool.qa': 'QA', 'tool.handoff': '핸드오프', 'tool.designqa': '디자인 QA',
     'common.close': '닫기',
     'ui.sizeCompact': '작은 패널',
     'ui.sizeDefault': '기본 패널',
@@ -1332,6 +1416,33 @@ const I18N = {
     'table.errPrefix': '오류: ',
     'table.colorLabels': { border: '라인색', headerBg: '헤더 배경', footerBg: '푸터 배경', altBg: '교대 행', cellBg: '일반 셀' },
     'table.directInput': '직접 입력',
+    'designqa.title': '디자인 QA 비교',
+    'designqa.desc': '디자인과 구현 페이지를 캡처해 차이를 라벨링하고 캔버스에 기록합니다.',
+    'designqa.rasterize': '선택 프레임 캡처',
+    'designqa.designPrev': '디자인 (선택 프레임)',
+    'designqa.implPrev': '구현',
+    'designqa.implUpload': '구현 스크린샷 업로드',
+    'designqa.urlPh': 'https://example.com — 실시간 URL (참고용)',
+    'designqa.urlNote': '실시간 URL은 참고용입니다. 타 도메인은 자동 캡처가 불가합니다.',
+    'designqa.urlBlocked': '이 사이트는 임베드를 차단합니다. 수동 업로드를 사용하세요.',
+    'designqa.labelHint': '구현 이미지 위에서 드래그해 차이를 라벨링하세요.',
+    'designqa.notePh': '차이 설명',
+    'designqa.category': '분류',
+    'designqa.cat.color': '색상',
+    'designqa.cat.spacing': '여백',
+    'designqa.cat.typography': '타이포그래피',
+    'designqa.cat.missing': '누락',
+    'designqa.cat.extra': '잘못 추가',
+    'designqa.cat.alignment': '정렬',
+    'designqa.cat.other': '기타',
+    'designqa.labels': '라벨',
+    'designqa.commit': '캔버스에 기록',
+    'designqa.noDesign': '프레임을 선택하고 먼저 캡처하세요.',
+    'designqa.noImpl': '구현 스크린샷을 먼저 업로드하세요.',
+    'designqa.committed': '보드가 생성되었습니다.',
+    'designqa.errEncodeFailed': '캡처에 실패했습니다. Figma 알림을 확인하세요.',
+    'designqa.errDesignUnreachable': '디자인 프레임을 찾을 수 없습니다. 다시 캡처하세요.',
+    'designqa.errDefault': '문제가 발생했습니다. Figma 알림을 확인하세요.',
   }
 };
 
@@ -1406,7 +1517,7 @@ function resizeUi(size) {
    Tool tab switching
    ═══════════════════════════════════════════════════════════════════════════ */
 function switchTool(tool) {
-  ['command', 'menu', 'style', 'table', 'qa', 'handoff'].forEach(k => {
+  ['command', 'menu', 'style', 'table', 'qa', 'handoff', 'designqa'].forEach(k => {
     document.getElementById('tool-' + k).classList.toggle('active', tool === k);
     document.getElementById('pane-' + k).classList.toggle('active', tool === k);
   });
@@ -3426,6 +3537,16 @@ window.onmessage = (event) => {
     el.className = 'result error'; el.style.display = 'block';
     return;
   }
+
+  /* ── Design QA Diff ── */
+  if (msg.type === 'qa-rasterize-result') {
+    qaRenderRasterResult(msg);
+    return;
+  }
+  if (msg.type === 'qa-commit-result') {
+    qaRenderCommitResult(msg);
+    return;
+  }
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -3435,6 +3556,203 @@ tableBuildColorRows();
 TABLE_COLOR_KEYS.forEach(k => tableUpdateSwatch(k));
 commandApplyProjectPreset('public-education');
 applyLang();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODULE: DESIGN QA DIFF
+   ═══════════════════════════════════════════════════════════════════════════ */
+let qaDesign = null;        // { bytes:Uint8Array, width, height, nodeId }
+let qaImpl = null;          // { bytes:Uint8Array, width, height }
+let qaLabels = [];
+let qaDrawing = null;       // active drag { x0,y0,x1,y1 } in display px
+
+const QA_CATEGORIES = ['color', 'spacing', 'typography', 'missing', 'extra', 'alignment', 'other'];
+
+function qaNormalizeRect(rect, dispW, dispH) {
+  return {
+    x: Math.max(0, Math.min(1, rect.x / dispW)),
+    y: Math.max(0, Math.min(1, rect.y / dispH)),
+    w: Math.max(0, Math.min(1, rect.w / dispW)),
+    h: Math.max(0, Math.min(1, rect.h / dispH)),
+  };
+}
+
+function qaBytesToObjectUrl(bytes) {
+  const blob = new Blob([bytes], { type: 'image/png' });
+  return URL.createObjectURL(blob);
+}
+
+function qaRenderLabels() {
+  const list = document.getElementById('qa-label-list');
+  list.innerHTML = '';
+  qaLabels.forEach((label, i) => {
+    const row = document.createElement('div');
+    row.className = 'fix-c-item';
+    const num = document.createElement('strong');
+    num.textContent = (i + 1) + '. ';
+    const note = document.createElement('input');
+    note.type = 'text'; note.className = 'grow'; note.value = label.note || '';
+    note.setAttribute('data-i18n-ph', 'designqa.notePh');
+    note.placeholder = t('designqa.notePh');
+    note.addEventListener('input', () => { label.note = note.value; });
+    const cat = document.createElement('select');
+    cat.className = 'col-select';
+    QA_CATEGORIES.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c; o.textContent = t('designqa.cat.' + c);
+      if (label.category === c) o.selected = true;
+      cat.appendChild(o);
+    });
+    cat.addEventListener('change', () => { label.category = cat.value; });
+    const del = document.createElement('button');
+    del.className = 'link-btn'; del.textContent = '×';
+    del.title = 'Remove';
+    del.addEventListener('click', () => { qaLabels.splice(i, 1); qaRedrawOverlay(); qaRenderLabels(); });
+    row.appendChild(num); row.appendChild(note); row.appendChild(cat); row.appendChild(del);
+    list.appendChild(row);
+  });
+}
+
+function qaRedrawOverlay() {
+  const canvas = document.getElementById('qa-label-overlay');
+  const img = document.getElementById('qa-impl-img');
+  if (!img.naturalWidth) return;
+  const dispW = img.clientWidth, dispH = img.clientHeight;
+  canvas.width = dispW; canvas.height = dispH;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, dispW, dispH);
+  const colors = ['#E63636', '#2563EB', '#16A34A', '#9333EA', '#D97706', '#0891B2', '#525252'];
+  qaLabels.forEach((label, i) => {
+    const x = label.x * dispW, y = label.y * dispH, w = label.w * dispW, h = label.h * dispH;
+    ctx.strokeStyle = colors[i % colors.length];
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, w, h);
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fillRect(x, y - 16, 24, 16);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 12px Inter, sans-serif';
+    ctx.fillText(String(i + 1), x + 4, y - 4);
+  });
+}
+
+function qaInitOverlay() {
+  const canvas = document.getElementById('qa-label-overlay');
+  const img = document.getElementById('qa-impl-img');
+  const stage = document.getElementById('qa-impl-stage');
+  const scope = (evt) => qaImpl && img.naturalWidth;
+  function pos(evt) {
+    const r = canvas.getBoundingClientRect();
+    return { x: Math.max(0, Math.min(r.width, evt.clientX - r.left)), y: Math.max(0, Math.min(r.height, evt.clientY - r.top)) };
+  }
+  canvas.addEventListener('mousedown', (evt) => {
+    if (!scope(evt)) return;
+    qaDrawing = { ...pos(evt) };
+  });
+  window.addEventListener('mousemove', (evt) => {
+    if (!qaDrawing) return;
+    const p = pos(evt);
+    const ctx = canvas.getContext('2d');
+    qaRedrawOverlay();
+    ctx.strokeStyle = '#E63636'; ctx.lineWidth = 2;
+    const x = Math.min(qaDrawing.x, p.x), y = Math.min(qaDrawing.y, p.y), w = Math.abs(p.x - qaDrawing.x), h = Math.abs(p.y - qaDrawing.y);
+    ctx.strokeRect(x, y, w, h);
+  });
+  window.addEventListener('mouseup', (evt) => {
+    if (!qaDrawing) return;
+    const p = pos(evt);
+    const r = canvas.getBoundingClientRect();
+    const x = Math.min(qaDrawing.x, p.x), y = Math.min(qaDrawing.y, p.y), w = Math.abs(p.x - qaDrawing.x), h = Math.abs(p.y - qaDrawing.y);
+    qaDrawing = null;
+    if (w < 6 || h < 6) return;
+    const norm = qaNormalizeRect({ x, y, w, h }, r.width, r.height);
+    qaLabels.push({ id: 'l' + Date.now(), x: norm.x, y: norm.y, w: norm.w, h: norm.h, note: '', category: 'other' });
+    qaRedrawOverlay();
+    qaRenderLabels();
+  });
+  img.addEventListener('load', qaRedrawOverlay);
+  window.addEventListener('resize', qaRedrawOverlay);
+  stage.addEventListener('dragover', (e) => e.preventDefault());
+  stage.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (file) qaLoadImplFile(file);
+  });
+}
+
+function qaLoadImplFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  file.arrayBuffer().then((buf) => {
+    const bytes = new Uint8Array(buf);
+    const url = qaBytesToObjectUrl(bytes);
+    const img = document.getElementById('qa-impl-img');
+    img.onload = () => {
+      qaImpl = { bytes, width: img.naturalWidth, height: img.naturalHeight };
+      qaRedrawOverlay();
+    };
+    img.src = url;
+  });
+}
+
+function qaRenderRasterResult(msg) {
+  const hint = document.getElementById('qa-design-hint');
+  const img = document.getElementById('qa-design-img');
+  if (msg.error) {
+    hint.textContent = t('designqa.noDesign');
+    return;
+  }
+  qaDesign = { bytes: msg.bytes, width: msg.width, height: msg.height, nodeId: msg.nodeId };
+  img.src = qaBytesToObjectUrl(msg.bytes);
+  hint.textContent = msg.width + ' × ' + msg.height;
+}
+
+function qaRenderCommitResult(msg) {
+  const result = document.getElementById('qa-result');
+  if (msg.error === 'design-unreachable') {
+    result.textContent = t('designqa.errDesignUnreachable');
+  } else if (msg.error) {
+    result.textContent = t('designqa.errDefault');
+  } else {
+    result.textContent = t('designqa.committed') + ' (' + (msg.labelCount || 0) + ')';
+    qaLabels = [];
+    qaRenderLabels();
+    qaRedrawOverlay();
+  }
+}
+
+document.getElementById('qa-capture').addEventListener('click', () => {
+  parent.postMessage({ pluginMessage: { type: 'qa-rasterize-request' } }, '*');
+});
+document.getElementById('qa-impl-file').addEventListener('change', (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (file) qaLoadImplFile(file);
+});
+const qaUrlInput = document.getElementById('qa-url');
+qaUrlInput.addEventListener('change', () => {
+  const frame = document.getElementById('qa-url-frame');
+  const blocked = document.getElementById('qa-url-blocked');
+  const url = qaUrlInput.value.trim();
+  if (!url) { frame.style.display = 'none'; blocked.style.display = 'none'; return; }
+  frame.style.display = 'block';
+  blocked.style.display = 'none';
+  frame.onload = () => { blocked.style.display = 'none'; };
+  frame.onerror = () => { blocked.style.display = 'block'; };
+  frame.src = url;
+});
+document.getElementById('qa-commit').addEventListener('click', () => {
+  const result = document.getElementById('qa-result');
+  if (!qaDesign) { result.textContent = t('designqa.noDesign'); return; }
+  if (!qaImpl) { result.textContent = t('designqa.noImpl'); return; }
+  parent.postMessage({
+    pluginMessage: {
+      type: 'qa-commit-board',
+      designNodeId: qaDesign.nodeId,
+      designW: qaDesign.width, designH: qaDesign.height,
+      implBytes: qaImpl.bytes, implW: qaImpl.width, implH: qaImpl.height,
+      labels: qaLabels.map(l => ({ id: l.id, x: l.x, y: l.y, w: l.w, h: l.h, note: l.note, category: l.category })),
+    },
+  }, '*');
+  result.textContent = '';
+});
+qaInitOverlay();
 </script>
 </body>
 </html>

@@ -33,6 +33,7 @@
     <button class="tool-tab"        id="tool-table"  onclick="switchTool('table')"  data-i18n="tool.table">Table Builder</button>
     <button class="tool-tab"        id="tool-qa"     onclick="switchTool('qa')"     data-i18n="tool.qa">QA</button>
     <button class="tool-tab"        id="tool-handoff" onclick="switchTool('handoff')" data-i18n="tool.handoff">Handoff</button>
+    <button class="tool-tab" id="tool-designqa" onclick="switchTool('designqa')" data-i18n="tool.designqa">Design QA</button>
   </div>
 
   <!-- ════════════════════════════════════════════════════════════════════
@@ -479,6 +480,54 @@
         <button class="btn" id="command-open-folder-maker" data-i18n="command.openFolderMaker">Open Folder Maker</button>
       </div>
       <div class="binding-list" id="handoff-result-list"></div>
+    </div>
+  </div>
+
+  <!-- PANE: DESIGN QA DIFF -->
+  <div class="tool-pane" id="pane-designqa">
+    <div>
+      <div class="panel-title" data-i18n="designqa.title">Design QA Diff</div>
+      <div class="panel-desc" data-i18n="designqa.desc">Capture the design and the implemented page, label the differences, commit to canvas.</div>
+    </div>
+
+    <div class="workspace-panel">
+      <div class="workspace-actions">
+        <button class="btn" id="qa-capture" data-i18n="designqa.rasterize">Capture selected frame</button>
+      </div>
+
+      <div class="qa-columns">
+        <div class="qa-col">
+          <div class="section-label" data-i18n="designqa.designPrev">Design (selected frame)</div>
+          <img id="qa-design-img" class="qa-preview" alt="">
+          <div class="hint" id="qa-design-hint" data-i18n="designqa.noDesign">Select a frame and capture it first.</div>
+        </div>
+        <div class="qa-col">
+          <div class="section-label" data-i18n="designqa.implPrev">Implementation</div>
+          <div class="qa-impl-stage" id="qa-impl-stage">
+            <img id="qa-impl-img" class="qa-preview" alt="">
+            <canvas id="qa-label-overlay" class="qa-overlay"></canvas>
+          </div>
+          <label class="file-label">
+            <span data-i18n="designqa.implUpload">Upload implementation screenshot</span>
+            <input type="file" accept="image/*" id="qa-impl-file" style="display:none">
+          </label>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:8px">
+        <input type="text" class="grow" id="qa-url" data-i18n-ph="designqa.urlPh">
+      </div>
+      <div class="hint" data-i18n="designqa.urlNote">Live URL is reference only — cross-origin pages cannot be auto-captured.</div>
+      <iframe id="qa-url-frame" class="qa-url-frame" style="display:none"></iframe>
+      <div class="hint" id="qa-url-blocked" style="display:none" data-i18n="designqa.urlBlocked">This site blocks embedding. Use manual upload.</div>
+
+      <div class="hint" style="margin-top:8px" data-i18n="designqa.labelHint">Drag on the implementation image to label a difference.</div>
+      <div class="binding-list" id="qa-label-list"></div>
+
+      <div class="workspace-actions" style="margin-top:8px">
+        <button class="btn btn-primary" id="qa-commit" data-i18n="designqa.commit">Commit to canvas</button>
+      </div>
+      <div class="result" id="qa-result"></div>
     </div>
   </div>
 

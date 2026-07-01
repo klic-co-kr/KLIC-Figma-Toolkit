@@ -430,4 +430,22 @@ assert(importDocument.getElementById('style-summary').textContent.includes('총 
 assert(importDocument.getElementById('style-result').textContent === '스타일 토큰 JSON을 가져왔습니다.', 'style JSON import did not render localized result text');
 assert(importHarness.getStyleProcessed().total === 89, 'style JSON import did not restore processed token data');
 
+// ── Design QA Diff panel ──
+assert(ui.includes('id="tool-designqa"') && ui.includes('id="pane-designqa"'), 'Design QA should be a top-level tool tab');
+assert(ui.includes('id="qa-capture"'), 'Design QA should expose a capture button');
+assert(ui.includes('id="qa-impl-file"'), 'Design QA should expose an implementation upload input');
+assert(ui.includes('id="qa-commit"'), 'Design QA should expose a commit button');
+assert(ui.includes('id="qa-label-overlay"'), 'Design QA should render a label overlay canvas');
+assert(script.includes("'designqa.title'"), 'i18n missing designqa.title key');
+assert(script.includes("'designqa.cat.color'"), 'i18n missing designqa category key');
+assert(script.includes("qaNormalizeRect"), 'Design QA should expose a pure qaNormalizeRect helper');
+
+const qaMathHarness = (() => {
+  const m = script.match(/function qaNormalizeRect\(rect, dispW, dispH\) \{[\s\S]*?\n\}/);
+  assert(m, 'qaNormalizeRect is missing or malformed');
+  return Function(`${m[0]}\nreturn { qaNormalizeRect };`)();
+})();
+const qaNorm = qaMathHarness.qaNormalizeRect({ x: 50, y: 100, w: 25, h: 50 }, 200, 400);
+assert(qaNorm.x === 0.25 && qaNorm.y === 0.25 && qaNorm.w === 0.125 && qaNorm.h === 0.125, 'qaNormalizeRect should convert px to normalized 0..1');
+
 console.log('KLIC UI i18n and style import/export roundtrip smoke test passed.');

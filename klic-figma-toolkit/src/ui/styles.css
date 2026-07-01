@@ -408,3 +408,11 @@
   .fix-c-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: #1b1b1b; border-radius: 6px; padding: 8px; font-size: 11px; color: #ddd; }
   .fix-c-list li .fix-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fix-c-list li .btn { flex: 0 0 auto; padding: 3px 10px; font-size: 11px; }
+
+/* ── Design QA Diff ── */
+.qa-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.qa-col { display: flex; flex-direction: column; gap: 6px; }
+.qa-preview { max-width: 100%; border: 1px solid #2a2a2a; border-radius: 6px; background: #111; }
+.qa-impl-stage { position: relative; display: inline-block; }
+.qa-overlay { position: absolute; inset: 0; cursor: crosshair; }
+.qa-url-frame { width: 100%; height: 180px; border: 1px solid #2a2a2a; border-radius: 6px; }
