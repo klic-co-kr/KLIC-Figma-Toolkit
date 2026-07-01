@@ -41,6 +41,10 @@ class BaseNode {
     this.height = height;
   }
 
+  exportAsync() {
+    return Promise.resolve(new Uint8Array([1, 2, 3, 4]));
+  }
+
   clone() {
     const cloned = new this.constructor();
     cloned.name = this.name;
@@ -221,6 +225,9 @@ const figma = {
   },
   createFrame() {
     return new FrameNode();
+  },
+  createImage() {
+    return { hash: nextId('img') };
   },
   createComponent() {
     return new ComponentNode();
@@ -950,5 +957,34 @@ assert(krdsNode.name === beforeName, 'AB batch must NEVER apply C-suggest (KRDS)
 await figma.ui.onmessage({ type: 'command-apply-fixes', ids: [krdsItem.id] });
 assert(krdsNode.name !== beforeName, 'KRDS suggestion should apply only via explicit per-item approval');
 assert(krdsNode.name === 'login-area', 'KRDS provider should rename 로그인 → login-area');
+
+// ── Design QA Diff: rasterize ──
+page.children = [];
+page.selection = [];
+figma.commitUndoCount = 0;
+
+await figma.ui.onmessage({ type: 'qa-rasterize-request' });
+var qaNoSel = latestMessage('qa-rasterize-result');
+assert(qaNoSel && qaNoSel.error === 'no-selection', 'qa-rasterize should report no-selection');
+
+page.selection = [page];
+await figma.ui.onmessage({ type: 'qa-rasterize-request' });
+var qaPageErr = latestMessage('qa-rasterize-result');
+assert(qaPageErr && qaPageErr.error === 'page-not-allowed', 'qa-rasterize should reject PageNode selection');
+
+var qaDesignFrame = figma.createFrame();
+qaDesignFrame.name = 'Design Source';
+qaDesignFrame.resize(320, 200);
+page.appendChild(qaDesignFrame);
+page.selection = [qaDesignFrame];
+await figma.ui.onmessage({ type: 'qa-rasterize-request' });
+var qaRaster = latestMessage('qa-rasterize-result');
+assert(qaRaster && qaRaster.bytes && qaRaster.width === 320 && qaRaster.height === 200, 'qa-rasterize should return PNG bytes + dimensions');
+assert(qaRaster.nodeId === qaDesignFrame.id, 'qa-rasterize should echo design node id');
+
+var qaMapped = vm.runInContext('qaMapNormalized(0.5, 200)', context);
+assert(qaMapped === 100, 'qaMapNormalized(0.5, 200) should be 100');
+var qaClamped = vm.runInContext('qaMapNormalized(1.4, 100)', context);
+assert(qaClamped === 100, 'qaMapNormalized should clamp >1 to size');
 
 console.log('Mock Figma runtime smoke test passed.');

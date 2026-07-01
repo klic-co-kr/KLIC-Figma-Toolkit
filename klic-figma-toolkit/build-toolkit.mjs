@@ -12,6 +12,7 @@ const codeSources = [
   'src/code/20-menu-generator.js',
   'src/code/30-style-guide.js',
   'src/code/40-table-builder.js',
+  'src/code/50-design-qa.js',
 ];
 
 function read(relPath) {
