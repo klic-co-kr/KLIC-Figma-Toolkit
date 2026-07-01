@@ -996,6 +996,8 @@ var qaClamped = vm.runInContext('qaMapNormalized(1.4, 100)', context);
 assert(qaClamped === 100, 'qaMapNormalized should clamp >1 to size');
 
 // ── Design QA Diff: commit board ──
+page.children = [];
+page.selection = [];
 var qaImplBytes = new Uint8Array([10, 20, 30, 40]);
 var qaLabels = [
   { id: 'l1', x: 0.25, y: 0.5, w: 0.2, h: 0.1, note: 'wrong color', category: 'color' },
@@ -1029,5 +1031,20 @@ await figma.ui.onmessage({
 });
 var qaUnreachable = latestMessage('qa-commit-result');
 assert(qaUnreachable && qaUnreachable.error === 'design-unreachable', 'qa-commit should report design-unreachable when the design node is gone');
+
+var qaDesignFrame2 = figma.createFrame();
+qaDesignFrame2.name = 'Design Source 2';
+qaDesignFrame2.resize(320, 200);
+page.appendChild(qaDesignFrame2);
+await figma.ui.onmessage({
+  type: 'qa-commit-board',
+  designNodeId: qaDesignFrame2.id,
+  designW: 320, designH: 200,
+  implBytes: new Uint8Array([10, 20, 30, 40]),
+  implW: 320, implH: 0,
+  labels: [],
+});
+var qaInvalid = latestMessage('qa-commit-result');
+assert(qaInvalid && qaInvalid.error === 'invalid-dimensions', 'qa-commit should reject zero/negative impl dimensions');
 
 console.log('Mock Figma runtime smoke test passed.');

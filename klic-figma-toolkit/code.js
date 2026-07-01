@@ -3521,6 +3521,10 @@ async function qaCommitBoard(msg) {
       figma.ui.postMessage({ type: 'qa-commit-result', error: 'design-unreachable' });
       return;
     }
+    if (msg.designH <= 0 || msg.designW <= 0 || msg.implH <= 0 || msg.implW <= 0) {
+      figma.ui.postMessage({ type: 'qa-commit-result', error: 'invalid-dimensions' });
+      return;
+    }
     var designBytes = await designNode.exportAsync({ format: 'PNG', constraint: { type: 'SCALE', value: 1 } });
     var designImage = figma.createImage(designBytes);
     var implImage = figma.createImage(msg.implBytes);
