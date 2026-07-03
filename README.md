@@ -13,8 +13,8 @@
 
 <br/>
 
-**메뉴 페이지 · 스타일 가이드 · 테이블 · 진단 센터**<br/>
-네 가지 Design Ops 도구를 하나의 Figma 플러그인으로
+**메뉴 페이지 · 스타일 가이드 · 테이블 · 진단 센터 · 디자인 QA**<br/>
+다섯 가지 Design Ops 도구를 하나의 Figma 플러그인으로
 
 <br/>
 
@@ -26,7 +26,7 @@
 
 KLIC Figma Toolkit은 디자이너와 개발자가 Figma 내에서 반복 작업을 줄이고, 디자인 시스템의 일관성을 유지할 수 있도록 만든 사내 전용 플러그인입니다.
 
-기존에 분리 운영되던 세 가지 플러그인(메뉴 페이지 생성기, 스타일 가이드 변수 생성기, 테이블 생성기)을 단일 인터페이스로 통합하고, **Command Center** — 파일 진단·색상 토큰 바인딩·핸드오프 내보내기를 담당하는 허브 — 를 추가했습니다.
+기존에 분리 운영되던 세 가지 플러그인(메뉴 페이지 생성기, 스타일 가이드 변수 생성기, 테이블 생성기)을 단일 인터페이스로 통합하고, **Command Center** — 파일 진단·색상 토큰 바인딩·핸드오프 내보내기를 담당하는 허브 — 와 **Design QA** — 디자인 캡처와 구현 스크린샷 비교 보드를 담당하는 검수 도구 — 를 추가했습니다.
 
 외부 네트워크 접근 없이 완전히 오프라인으로 동작합니다.
 
@@ -40,6 +40,7 @@ KLIC Figma Toolkit은 디자이너와 개발자가 Figma 내에서 반복 작업
 | 📄 | **Menu Page Generator** | CSV·URL·HTML 입력으로 메뉴 계층 페이지 일괄 생성 |
 | 🎨 | **Style Guide Generator** | 디자인 토큰 변수 생성, 스타일 가이드 보드 드로잉, 컴포넌트 자동화 |
 | 📊 | **Table Builder** | 변수 기반 스타일 적용 테이블 생성 (통합·분리·HTML 입력) |
+| 🧭 | **Design QA** | 선택한 디자인과 구현 스크린샷을 비교하고 agent note 생성 |
 
 <br/>
 
@@ -104,6 +105,21 @@ CSV 또는 수동 입력으로 다단계 메뉴 구조를 Figma 페이지로 변
 - 통합 셀 / 분리 셀 / HTML 테이블 세 가지 입력 모드
 - 생성 시 현재 파일의 로컬 COLOR 변수를 자동으로 불러와 적용
 
+<br/>
+
+### 🧭 Design QA
+
+선택한 Figma 디자인 노드와 구현 스크린샷을 나란히 비교하고, 차이를 번호가 붙은 주석으로 기록합니다.
+
+- **디자인 캡처** — 선택한 Frame, Component, Group, Section을 PNG로 래스터라이즈하고 원본 노드 id를 보존
+- **구현 스크린샷 업로드** — 로컬 이미지 파일을 비교 대상으로 로드하고 1568px long edge 안으로 자동 축소
+- **주석 도구** — 클릭은 point, 드래그는 rectangle, Shift+drag는 arrow로 기록
+- **Agent note 복사** — `[n] point/rect/arrow` 좌표를 구현 스크린샷 픽셀 기준으로 내보내는 `klic-qa-note v1` 텍스트 생성
+- **QA 보드 생성** — 디자인/구현 이미지를 Figma 캔버스에 배치하고 point·rect·arrow 마커와 캡션을 영속화
+- **Figma 이미지 제한 대응** — 디자인 export는 Figma `createImage`의 4096px 제한을 넘지 않도록 자동 스케일링
+
+업스트림 검토와 통합 판단 기록은 [`docs/capture-for-agents-review.md`](docs/capture-for-agents-review.md)에 남겼습니다.
+
 ---
 
 ## 시작하기
@@ -140,8 +156,8 @@ node klic-figma-toolkit/run-local-verification.mjs
 | 스크립트 | 검증 항목 |
 |---|---|
 | `verify-integration.mjs` | 메시지 타입 계약, i18n 키 완전성, 임베드 MD 일치 여부 |
-| `run-ui-roundtrip-smoke.mjs` | 스타일 가이드 JSON 내보내기/가져오기 라운드트립, EN/KO DOM |
-| `run-smoke-test-mock.mjs` | 변수 API 비동기 래퍼, OKLCH 정책, 출처 요약, 핸드오프 내보내기 |
+| `run-ui-roundtrip-smoke.mjs` | 스타일 가이드 JSON 내보내기/가져오기 라운드트립, EN/KO DOM, Design QA agent note 인코딩 |
+| `run-smoke-test-mock.mjs` | 변수 API 비동기 래퍼, OKLCH 정책, 출처 요약, 핸드오프 내보내기, Design QA 보드 생성 |
 | `validate-smoke-evidence.mjs` | 런타임 스모크 증거 JSON 구조 검증 |
 | `validate-style-token-json.mjs` | 내보낸 스타일 토큰 JSON 구조 검증 |
 
@@ -175,7 +191,8 @@ klic-figma-toolkit/
 │   │   ├── 10-command-center.js   # 진단·바인딩·내보내기·접근성 감사
 │   │   ├── 20-menu-generator.js
 │   │   ├── 30-style-guide.js
-│   │   └── 40-table-builder.js
+│   │   ├── 40-table-builder.js
+│   │   └── 50-design-qa.js
 │   └── ui/                # 플러그인 UI 소스 (브라우저 iframe)
 │       ├── index.html · styles.css · i18n.js · app.js
 ├── code.js                # ⚙️ 생성된 번들 — 직접 수정 금지
@@ -207,12 +224,14 @@ window.onmessage               ←──── figma.ui.postMessage
 | `menu-*` | Menu Page Generator |
 | `style-*` | Style Guide Generator |
 | `table-*` | Table Builder |
+| `qa-*` | Design QA |
 
 **주요 제약**
 
 - `code.js`·`ui.html`은 생성된 번들 — 직접 수정 금지. `src/`를 고치고 `build-toolkit.mjs`로 재빌드 (`run-source-split-check.mjs`가 동기화 강제)
 - `src/code/`는 Figma 샌드박스 대상 — 기존 스타일(`var`, 일반 함수 선언) 유지. `src/ui/`는 브라우저 iframe이라 최신 JS 사용 가능
 - Figma 변수·페이지 API는 반드시 `src/code/`의 비동기 래퍼 함수(`commandGetLocalVariables` 등)를 통해 호출 — `dynamic-page` 모드에서 동기 API는 예외 발생
+- Figma `createImage`는 4096px 한계가 있으므로 Design QA 디자인 export와 구현 스크린샷 업로드 경로의 스케일링 정책을 우회하지 말 것
 - `style-guide-viewer_ver2.md`와 `메뉴샘플.csv`는 `src/ui/app.js`에 리터럴로 임베드 — 파일 수정 시 임베드 값도 동기화 (`verify-integration.mjs`가 바이트 단위 일치 검증)
 
 ---
@@ -256,7 +275,7 @@ window.onmessage               ←──── figma.ui.postMessage
 
 ```json
 {
-  "tool": "menu | style | table",
+  "tool": "menu | style | table | qa-diff",
   "version": "0.1.0",
   "generatedAt": "2026-06-30T00:00:00.000Z",
   "sourceName": "메뉴샘플.csv",
