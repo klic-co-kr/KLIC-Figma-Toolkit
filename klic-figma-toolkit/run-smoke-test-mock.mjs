@@ -41,7 +41,8 @@ class BaseNode {
     this.height = height;
   }
 
-  exportAsync() {
+  exportAsync(settings) {
+    this.lastExportSettings = settings || null;
     return Promise.resolve(new Uint8Array([1, 2, 3, 4]));
   }
 
@@ -106,6 +107,23 @@ class RectangleNode extends BaseNode {
     super('RECTANGLE');
     this.fills = [];
     this.strokes = [];
+  }
+}
+
+class EllipseNode extends BaseNode {
+  constructor() {
+    super('ELLIPSE');
+    this.fills = [];
+    this.strokes = [];
+  }
+}
+
+class LineNode extends BaseNode {
+  constructor() {
+    super('LINE');
+    this.fills = [];
+    this.strokes = [];
+    this.rotation = 0;
   }
 }
 
@@ -222,6 +240,12 @@ const figma = {
   },
   createRectangle() {
     return new RectangleNode();
+  },
+  createEllipse() {
+    return new EllipseNode();
+  },
+  createLine() {
+    return new LineNode();
   },
   createFrame() {
     return new FrameNode();
@@ -994,14 +1018,29 @@ var qaMapped = vm.runInContext('qaMapNormalized(0.5, 200)', context);
 assert(qaMapped === 100, 'qaMapNormalized(0.5, 200) should be 100');
 var qaClamped = vm.runInContext('qaMapNormalized(1.4, 100)', context);
 assert(qaClamped === 100, 'qaMapNormalized should clamp >1 to size');
+var qaSmallExportScale = vm.runInContext('qaExportScaleForSize(320, 200)', context);
+assert(qaSmallExportScale === 1, 'qaExportScaleForSize should leave images within the Figma image cap unchanged');
+var qaLargeExportScale = vm.runInContext('qaExportScaleForSize(8192, 4096)', context);
+assert(qaLargeExportScale === 0.5, 'qaExportScaleForSize should cap exported images to the 4096px Figma image limit');
+
+var qaLargeDesignFrame = figma.createFrame();
+qaLargeDesignFrame.name = 'Large Design Source';
+qaLargeDesignFrame.resize(8192, 4096);
+page.appendChild(qaLargeDesignFrame);
+page.selection = [qaLargeDesignFrame];
+await figma.ui.onmessage({ type: 'qa-rasterize-request' });
+var qaLargeRaster = latestMessage('qa-rasterize-result');
+assert(qaLargeRaster && qaLargeRaster.width === 4096 && qaLargeRaster.height === 2048, 'qa-rasterize should report scaled dimensions when design exceeds the Figma image cap');
+assert(qaLargeDesignFrame.lastExportSettings?.constraint?.value === 0.5, 'qa-rasterize should downscale large design exports before createImage');
 
 // ── Design QA Diff: commit board ──
 page.children = [];
 page.selection = [];
 var qaImplBytes = new Uint8Array([10, 20, 30, 40]);
 var qaLabels = [
-  { id: 'l1', x: 0.25, y: 0.5, w: 0.2, h: 0.1, note: 'wrong color', category: 'color' },
-  { id: 'l2', x: 0.6, y: 0.2, w: 0.15, h: 0.05, note: '', category: 'spacing' },
+  { id: 'l1', kind: 'rect', x: 0.25, y: 0.5, w: 0.2, h: 0.1, note: 'wrong color', category: 'color' },
+  { id: 'l2', kind: 'point', x: 0.6, y: 0.2, note: '', category: 'typography' },
+  { id: 'l3', kind: 'arrow', x: 0.7, y: 0.1, x2: 0.8, y2: 0.4, note: 'move down', category: 'spacing' },
 ];
 await figma.ui.onmessage({
   type: 'qa-commit-board',
@@ -1012,14 +1051,19 @@ await figma.ui.onmessage({
 });
 var qaCommitted = latestMessage('qa-commit-result');
 assert(qaCommitted && qaCommitted.boardId, 'qa-commit-board should create a board');
-assert(qaCommitted.labelCount === 2, 'qa-commit-board should echo label count');
+assert(qaCommitted.labelCount === 3, 'qa-commit-board should echo label count');
 var qaBoard = figma.getNodeById(qaCommitted.boardId);
 assert(qaBoard && qaBoard.name === 'KLIC Design QA Diff', 'qa board should be created and named');
 var qaMeta = JSON.parse(qaBoard.getPluginData('klic.meta'));
 assert(qaMeta.tool === 'qa-diff', 'qa board should be tagged qa-diff');
-assert(qaMeta.labelCount === 2 && qaMeta.categories.join(',') === 'color,spacing', 'qa board pluginData should persist label meta');
+assert(qaMeta.labelCount === 3 && qaMeta.categories.join(',') === 'color,typography,spacing', 'qa board pluginData should persist label meta');
+assert(qaMeta.kinds.join(',') === 'rect,point,arrow', 'qa board pluginData should persist annotation kinds');
 var qaBoxes = qaBoard.findAll(function (n) { return n.type === 'RECTANGLE' && /QA Label/.test(n.name); });
-assert(qaBoxes.length === 2, 'qa board should render one rectangle per label');
+assert(qaBoxes.length === 1, 'qa board should render one rectangle for rect annotations');
+var qaPoints = qaBoard.findAll(function (n) { return n.type === 'ELLIPSE' && /QA Point/.test(n.name); });
+assert(qaPoints.length === 1, 'qa board should render one point marker per point annotation');
+var qaArrows = qaBoard.findAll(function (n) { return n.type === 'LINE' && /QA Arrow/.test(n.name); });
+assert(qaArrows.length >= 1, 'qa board should render line nodes for arrow annotations');
 
 nodeMap.delete(qaDesignFrame.id);
 await figma.ui.onmessage({

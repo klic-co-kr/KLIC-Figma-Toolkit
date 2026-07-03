@@ -2118,6 +2118,7 @@ let qaLabels = [];
 let qaDrawing = null;       // active drag { x0,y0,x1,y1 } in display px
 
 const QA_CATEGORIES = ['color', 'spacing', 'typography', 'missing', 'extra', 'alignment', 'other'];
+const QA_MAX_AGENT_IMAGE_EDGE = 1568;
 
 function qaNormalizeRect(rect, dispW, dispH) {
   return {
@@ -2133,6 +2134,156 @@ function qaBytesToObjectUrl(bytes) {
   return URL.createObjectURL(blob);
 }
 
+function qaPlanImageScale(width, height) {
+  const w = Math.max(1, Math.round(Number(width) || 1));
+  const h = Math.max(1, Math.round(Number(height) || 1));
+  const edge = Math.max(w, h);
+  if (edge <= QA_MAX_AGENT_IMAGE_EDGE) return { width: w, height: h, factor: 1 };
+  const factor = QA_MAX_AGENT_IMAGE_EDGE / edge;
+  return {
+    width: Math.max(1, Math.round(w * factor)),
+    height: Math.max(1, Math.round(h * factor)),
+    factor,
+  };
+}
+
+function qaCanvasToPngBytes(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error('png encode failed'));
+        return;
+      }
+      blob.arrayBuffer().then((buf) => resolve(new Uint8Array(buf)), reject);
+    }, 'image/png');
+  });
+}
+
+function qaSetImplImage(bytes, width, height) {
+  qaImpl = { bytes, width, height };
+  document.getElementById('qa-impl-img').src = qaBytesToObjectUrl(bytes);
+  qaUpdateAgentNote();
+}
+
+function qaClamp01(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(1, n));
+}
+
+function qaPixelCoord(value, size) {
+  const max = Math.max(1, Math.round(Number(size) || 1));
+  return Math.min(max - 1, Math.max(0, Math.round(qaClamp01(value) * max)));
+}
+
+function qaPixelPoint(label, imgW, imgH) {
+  return {
+    x: qaPixelCoord(label && label.x, imgW),
+    y: qaPixelCoord(label && label.y, imgH),
+  };
+}
+
+function qaPixelRect(label, imgW, imgH) {
+  const width = Math.max(1, Math.round(Number(imgW) || 1));
+  const height = Math.max(1, Math.round(Number(imgH) || 1));
+  const x = qaClamp01(label && label.x);
+  const y = qaClamp01(label && label.y);
+  const w = qaClamp01(label && label.w);
+  const h = qaClamp01(label && label.h);
+  const x1 = qaPixelCoord(x, width);
+  const y1 = qaPixelCoord(y, height);
+  const x2 = qaPixelCoord(Math.min(1, x + w), width);
+  const y2 = qaPixelCoord(Math.min(1, y + h), height);
+  return {
+    x1: Math.min(x1, x2),
+    y1: Math.min(y1, y2),
+    x2: Math.max(x1, x2),
+    y2: Math.max(y1, y2),
+  };
+}
+
+function qaPixelArrow(label, imgW, imgH) {
+  const start = qaPixelPoint(label, imgW, imgH);
+  return {
+    x1: start.x,
+    y1: start.y,
+    x2: qaPixelCoord(label && label.x2, imgW),
+    y2: qaPixelCoord(label && label.y2, imgH),
+  };
+}
+
+function qaEncodeAgentNote(design, impl, labels) {
+  const implW = Math.max(0, Math.round((impl && impl.width) || 0));
+  const implH = Math.max(0, Math.round((impl && impl.height) || 0));
+  const designW = Math.max(0, Math.round((design && design.width) || 0));
+  const designH = Math.max(0, Math.round((design && design.height) || 0));
+  const designId = design && design.nodeId ? design.nodeId : 'not-captured';
+  const lines = [
+    '```klic-qa-note v1',
+    'source: KLIC Figma Toolkit Design QA',
+    'design-node: ' + designId + ' ' + designW + 'x' + designH,
+    'size: ' + implW + 'x' + implH,
+    'scale: 1 image px = 1 uploaded image px',
+    'coordinate-space: implementation image pixels, origin top-left',
+  ];
+  const items = labels || [];
+  if (!items.length) {
+    lines.push('labels: none');
+  }
+  items.forEach((label, i) => {
+    const kind = label && label.kind === 'point' ? 'point' : label && label.kind === 'arrow' ? 'arrow' : 'rect';
+    const category = label && label.category ? String(label.category) : 'other';
+    if (kind === 'point') {
+      const p = qaPixelPoint(label, implW || 1, implH || 1);
+      lines.push('[' + (i + 1) + '] point (' + p.x + ',' + p.y + ') "' + category.replace(/"/g, "'") + '"');
+    } else if (kind === 'arrow') {
+      const a = qaPixelArrow(label, implW || 1, implH || 1);
+      lines.push('[' + (i + 1) + '] arrow (' + a.x1 + ',' + a.y1 + ')->(' + a.x2 + ',' + a.y2 + ') "' + category.replace(/"/g, "'") + '"');
+    } else {
+      const r = qaPixelRect(label, implW || 1, implH || 1);
+      lines.push('[' + (i + 1) + '] rect (' + r.x1 + ',' + r.y1 + ')-(' + r.x2 + ',' + r.y2 + ') "' + category.replace(/"/g, "'") + '"');
+    }
+    const note = String((label && label.note) || '').replace(/\s+$/, '');
+    if (note) {
+      note.split(/\r?\n/).forEach((line) => {
+        lines.push('    ' + line);
+      });
+    }
+  });
+  lines.push('hint: Match each [n] to the numbered point/rect/arrow marker in the KLIC Design QA board or overlay. Coordinates are implementation screenshot pixels.');
+  lines.push('```');
+  return lines.join('\n') + '\n';
+}
+
+function qaUpdateAgentNote() {
+  const textarea = document.getElementById('qa-agent-note');
+  if (!textarea) return '';
+  const text = qaEncodeAgentNote(qaDesign, qaImpl, qaLabels);
+  textarea.value = text;
+  return text;
+}
+
+function qaSelectAgentNote() {
+  const textarea = document.getElementById('qa-agent-note');
+  const result = document.getElementById('qa-result');
+  if (!textarea) return;
+  textarea.focus();
+  textarea.select();
+  if (result) result.textContent = t('designqa.noteSelected');
+}
+
+function qaCopyAgentNote() {
+  const text = qaUpdateAgentNote();
+  const result = document.getElementById('qa-result');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      if (result) result.textContent = t('designqa.noteCopied');
+    }).catch(() => qaSelectAgentNote());
+  } else {
+    qaSelectAgentNote();
+  }
+}
+
 function qaRenderLabels() {
   const list = document.getElementById('qa-label-list');
   list.innerHTML = '';
@@ -2140,12 +2291,12 @@ function qaRenderLabels() {
     const row = document.createElement('div');
     row.className = 'fix-c-item';
     const num = document.createElement('strong');
-    num.textContent = (i + 1) + '. ';
+    num.textContent = (i + 1) + '. ' + (label.kind || 'rect') + ' ';
     const note = document.createElement('input');
     note.type = 'text'; note.className = 'grow'; note.value = label.note || '';
     note.setAttribute('data-i18n-ph', 'designqa.notePh');
     note.placeholder = t('designqa.notePh');
-    note.addEventListener('input', () => { label.note = note.value; });
+    note.addEventListener('input', () => { label.note = note.value; qaUpdateAgentNote(); });
     const cat = document.createElement('select');
     cat.className = 'col-select';
     QA_CATEGORIES.forEach(c => {
@@ -2154,7 +2305,7 @@ function qaRenderLabels() {
       if (label.category === c) o.selected = true;
       cat.appendChild(o);
     });
-    cat.addEventListener('change', () => { label.category = cat.value; });
+    cat.addEventListener('change', () => { label.category = cat.value; qaUpdateAgentNote(); });
     const del = document.createElement('button');
     del.className = 'link-btn'; del.textContent = '×';
     del.title = 'Remove';
@@ -2162,6 +2313,7 @@ function qaRenderLabels() {
     row.appendChild(num); row.appendChild(note); row.appendChild(cat); row.appendChild(del);
     list.appendChild(row);
   });
+  qaUpdateAgentNote();
 }
 
 function qaRedrawOverlay() {
@@ -2174,16 +2326,50 @@ function qaRedrawOverlay() {
   ctx.clearRect(0, 0, dispW, dispH);
   const colors = ['#E63636', '#2563EB', '#16A34A', '#9333EA', '#D97706', '#0891B2', '#525252'];
   qaLabels.forEach((label, i) => {
-    const x = label.x * dispW, y = label.y * dispH, w = label.w * dispW, h = label.h * dispH;
-    ctx.strokeStyle = colors[i % colors.length];
+    const color = colors[i % colors.length];
+    const x = label.x * dispW, y = label.y * dispH;
+    ctx.strokeStyle = color;
     ctx.lineWidth = 2;
-    ctx.strokeRect(x, y, w, h);
-    ctx.fillStyle = colors[i % colors.length];
-    ctx.fillRect(x, y - 16, 24, 16);
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 12px Inter, sans-serif';
-    ctx.fillText(String(i + 1), x + 4, y - 4);
+    if (label.kind === 'point') {
+      ctx.beginPath();
+      ctx.arc(x, y, 7, 0, Math.PI * 2);
+      ctx.stroke();
+      qaDrawOverlayBadge(ctx, x + 14, y - 14, i, color);
+    } else if (label.kind === 'arrow') {
+      const x2 = label.x2 * dispW, y2 = label.y2 * dispH;
+      qaDrawOverlayArrow(ctx, x, y, x2, y2, color);
+      qaDrawOverlayBadge(ctx, x + 14, y - 14, i, color);
+    } else {
+      const w = label.w * dispW, h = label.h * dispH;
+      ctx.strokeRect(x, y, w, h);
+      qaDrawOverlayBadge(ctx, x, y - 16, i, color);
+    }
   });
+}
+
+function qaDrawOverlayBadge(ctx, x, y, index, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x, y, 24, 16);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 12px Inter, sans-serif';
+  ctx.fillText(String(index + 1), x + 4, y + 12);
+}
+
+function qaDrawOverlayArrow(ctx, x1, y1, x2, y2, color) {
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+  const head = 10;
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - Math.cos(angle - Math.PI / 6) * head, y2 - Math.sin(angle - Math.PI / 6) * head);
+  ctx.lineTo(x2 - Math.cos(angle + Math.PI / 6) * head, y2 - Math.sin(angle + Math.PI / 6) * head);
+  ctx.closePath();
+  ctx.fill();
 }
 
 function qaInitOverlay() {
@@ -2197,7 +2383,7 @@ function qaInitOverlay() {
   }
   canvas.addEventListener('mousedown', (evt) => {
     if (!scope(evt)) return;
-    qaDrawing = { ...pos(evt) };
+    qaDrawing = { ...pos(evt), shift: evt.shiftKey };
   });
   window.addEventListener('mousemove', (evt) => {
     if (!qaDrawing) return;
@@ -2206,17 +2392,33 @@ function qaInitOverlay() {
     qaRedrawOverlay();
     ctx.strokeStyle = '#E63636'; ctx.lineWidth = 2;
     const x = Math.min(qaDrawing.x, p.x), y = Math.min(qaDrawing.y, p.y), w = Math.abs(p.x - qaDrawing.x), h = Math.abs(p.y - qaDrawing.y);
-    ctx.strokeRect(x, y, w, h);
+    if (qaDrawing.shift || evt.shiftKey) qaDrawOverlayArrow(ctx, qaDrawing.x, qaDrawing.y, p.x, p.y, '#E63636');
+    else ctx.strokeRect(x, y, w, h);
   });
   window.addEventListener('mouseup', (evt) => {
     if (!qaDrawing) return;
+    const start = qaDrawing;
     const p = pos(evt);
     const r = canvas.getBoundingClientRect();
-    const x = Math.min(qaDrawing.x, p.x), y = Math.min(qaDrawing.y, p.y), w = Math.abs(p.x - qaDrawing.x), h = Math.abs(p.y - qaDrawing.y);
+    const x = Math.min(start.x, p.x), y = Math.min(start.y, p.y), w = Math.abs(p.x - start.x), h = Math.abs(p.y - start.y);
     qaDrawing = null;
-    if (w < 6 || h < 6) return;
-    const norm = qaNormalizeRect({ x, y, w, h }, r.width, r.height);
-    qaLabels.push({ id: 'l' + Date.now(), x: norm.x, y: norm.y, w: norm.w, h: norm.h, note: '', category: 'other' });
+    if (w < 6 && h < 6) {
+      qaLabels.push({ id: 'l' + Date.now(), kind: 'point', x: qaClamp01(p.x / r.width), y: qaClamp01(p.y / r.height), note: '', category: 'other' });
+    } else if (start.shift || evt.shiftKey) {
+      qaLabels.push({
+        id: 'l' + Date.now(),
+        kind: 'arrow',
+        x: qaClamp01(start.x / r.width),
+        y: qaClamp01(start.y / r.height),
+        x2: qaClamp01(p.x / r.width),
+        y2: qaClamp01(p.y / r.height),
+        note: '',
+        category: 'other',
+      });
+    } else {
+      const norm = qaNormalizeRect({ x, y, w, h }, r.width, r.height);
+      qaLabels.push({ id: 'l' + Date.now(), kind: 'rect', x: norm.x, y: norm.y, w: norm.w, h: norm.h, note: '', category: 'other' });
+    }
     qaRedrawOverlay();
     qaRenderLabels();
   });
@@ -2234,13 +2436,27 @@ function qaLoadImplFile(file) {
   if (!file || !file.type.startsWith('image/')) return;
   file.arrayBuffer().then((buf) => {
     const bytes = new Uint8Array(buf);
-    const url = qaBytesToObjectUrl(bytes);
-    const img = document.getElementById('qa-impl-img');
-    img.onload = () => {
-      qaImpl = { bytes, width: img.naturalWidth, height: img.naturalHeight };
-      qaRedrawOverlay();
+    const probe = new Image();
+    probe.onload = () => {
+      const plan = qaPlanImageScale(probe.naturalWidth, probe.naturalHeight);
+      if (plan.factor === 1) {
+        qaSetImplImage(bytes, plan.width, plan.height);
+        return;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = plan.width;
+      canvas.height = plan.height;
+      canvas.getContext('2d').drawImage(probe, 0, 0, plan.width, plan.height);
+      qaCanvasToPngBytes(canvas).then((scaledBytes) => {
+        qaSetImplImage(scaledBytes, plan.width, plan.height);
+      }).catch(() => {
+        document.getElementById('qa-result').textContent = t('designqa.errEncodeFailed');
+      });
     };
-    img.src = url;
+    probe.onerror = () => {
+      document.getElementById('qa-result').textContent = t('designqa.errEncodeFailed');
+    };
+    probe.src = qaBytesToObjectUrl(bytes);
   });
 }
 
@@ -2260,6 +2476,7 @@ function qaRenderRasterResult(msg) {
   qaDesign = { bytes: msg.bytes, width: msg.width, height: msg.height, nodeId: msg.nodeId };
   img.src = qaBytesToObjectUrl(msg.bytes);
   hint.textContent = msg.width + ' × ' + msg.height;
+  qaUpdateAgentNote();
 }
 
 function qaRenderCommitResult(msg) {
@@ -2273,6 +2490,7 @@ function qaRenderCommitResult(msg) {
     qaLabels = [];
     qaRenderLabels();
     qaRedrawOverlay();
+    qaUpdateAgentNote();
   }
 }
 
@@ -2305,9 +2523,11 @@ document.getElementById('qa-commit').addEventListener('click', () => {
       designNodeId: qaDesign.nodeId,
       designW: qaDesign.width, designH: qaDesign.height,
       implBytes: qaImpl.bytes, implW: qaImpl.width, implH: qaImpl.height,
-      labels: qaLabels.map(l => ({ id: l.id, x: l.x, y: l.y, w: l.w, h: l.h, note: l.note, category: l.category })),
+      labels: qaLabels.map(l => ({ id: l.id, kind: l.kind || 'rect', x: l.x, y: l.y, x2: l.x2, y2: l.y2, w: l.w, h: l.h, note: l.note, category: l.category })),
     },
   }, '*');
   result.textContent = '';
 });
+document.getElementById('qa-copy-note').addEventListener('click', qaCopyAgentNote);
 qaInitOverlay();
+qaUpdateAgentNote();

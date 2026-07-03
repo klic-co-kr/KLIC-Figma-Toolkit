@@ -435,10 +435,14 @@ assert(ui.includes('id="tool-designqa"') && ui.includes('id="pane-designqa"'), '
 assert(ui.includes('id="qa-capture"'), 'Design QA should expose a capture button');
 assert(ui.includes('id="qa-impl-file"'), 'Design QA should expose an implementation upload input');
 assert(ui.includes('id="qa-commit"'), 'Design QA should expose a commit button');
+assert(ui.includes('id="qa-copy-note"'), 'Design QA should expose a copy-agent-note button');
+assert(ui.includes('id="qa-agent-note"'), 'Design QA should expose a copyable agent-note textarea');
 assert(ui.includes('id="qa-label-overlay"'), 'Design QA should render a label overlay canvas');
 assert(script.includes("'designqa.title'"), 'i18n missing designqa.title key');
 assert(script.includes("'designqa.cat.color'"), 'i18n missing designqa category key');
 assert(script.includes("qaNormalizeRect"), 'Design QA should expose a pure qaNormalizeRect helper');
+assert(script.includes("qaEncodeAgentNote"), 'Design QA should expose a pure qaEncodeAgentNote helper');
+assert(script.includes("qaPlanImageScale"), 'Design QA should expose a pure qaPlanImageScale helper');
 
 const qaMathHarness = (() => {
   const m = script.match(/function qaNormalizeRect\(rect, dispW, dispH\) \{[\s\S]*?\n\}/);
@@ -447,5 +451,51 @@ const qaMathHarness = (() => {
 })();
 const qaNorm = qaMathHarness.qaNormalizeRect({ x: 50, y: 100, w: 25, h: 50 }, 200, 400);
 assert(qaNorm.x === 0.25 && qaNorm.y === 0.25 && qaNorm.w === 0.125 && qaNorm.h === 0.125, 'qaNormalizeRect should convert px to normalized 0..1');
+
+function extractFunctionBlock(source, name) {
+  const start = source.indexOf(`function ${name}`);
+  assert(start >= 0, `${name} is missing`);
+  const braceStart = source.indexOf('{', start);
+  let depth = 0;
+  for (let i = braceStart; i < source.length; i++) {
+    if (source[i] === '{') depth++;
+    else if (source[i] === '}') {
+      depth--;
+      if (depth === 0) return source.slice(start, i + 1);
+    }
+  }
+  throw new Error(`${name} is malformed`);
+}
+
+const qaNoteHarness = (() => {
+  const edgeMatch = script.match(/const QA_MAX_AGENT_IMAGE_EDGE = \d+;/);
+  assert(edgeMatch, 'QA_MAX_AGENT_IMAGE_EDGE constant is missing');
+  const names = ['qaPlanImageScale', 'qaClamp01', 'qaPixelCoord', 'qaPixelPoint', 'qaPixelRect', 'qaPixelArrow', 'qaEncodeAgentNote'];
+  const blocks = names.map((name) => extractFunctionBlock(script, name)).join('\n');
+  return Function(`${edgeMatch[0]}\n${blocks}\nreturn { qaPlanImageScale, qaPixelRect, qaEncodeAgentNote };`)();
+})();
+const qaSmallScale = qaNoteHarness.qaPlanImageScale(640, 400);
+assert(qaSmallScale.width === 640 && qaSmallScale.height === 400 && qaSmallScale.factor === 1, 'qaPlanImageScale should keep images within the agent image edge unchanged');
+const qaLargeScale = qaNoteHarness.qaPlanImageScale(5000, 3000);
+assert(qaLargeScale.width === 1568 && qaLargeScale.height === 941 && qaLargeScale.factor < 1, 'qaPlanImageScale should downscale oversized images to the 1568px long edge');
+const qaRect = qaNoteHarness.qaPixelRect({ x: 0.25, y: 0.5, w: 0.2, h: 0.1 }, 320, 200);
+assert(qaRect.x1 === 80 && qaRect.y1 === 100 && qaRect.x2 === 144 && qaRect.y2 === 120, 'qaPixelRect should map normalized labels to implementation pixels');
+const qaNote = qaNoteHarness.qaEncodeAgentNote(
+  { nodeId: '42:1', width: 640, height: 400 },
+  { width: 320, height: 200 },
+  [
+    { kind: 'point', x: 0.1, y: 0.2, note: 'small icon', category: 'typography' },
+    { kind: 'rect', x: 0.25, y: 0.5, w: 0.2, h: 0.1, note: 'wrong color', category: 'color' },
+    { kind: 'arrow', x: 0.7, y: 0.1, x2: 0.8, y2: 0.4, note: 'move down', category: 'spacing' },
+  ],
+);
+assert(qaNote.includes('```klic-qa-note v1'), 'qaEncodeAgentNote should use the KLIC agent-note fence');
+assert(qaNote.includes('design-node: 42:1 640x400'), 'qaEncodeAgentNote should include design node context');
+assert(qaNote.includes('size: 320x200'), 'qaEncodeAgentNote should include implementation coordinate size');
+assert(qaNote.includes('[1] point (32,40) "typography"'), 'qaEncodeAgentNote should emit numbered point coordinates in implementation pixels');
+assert(qaNote.includes('[2] rect (80,100)-(144,120) "color"'), 'qaEncodeAgentNote should emit numbered rect coordinates in implementation pixels');
+assert(qaNote.includes('[3] arrow (224,20)->(256,80) "spacing"'), 'qaEncodeAgentNote should emit numbered arrow coordinates in implementation pixels');
+assert(qaNote.includes('    wrong color'), 'qaEncodeAgentNote should indent label notes');
+assert(qaNote.includes('    move down'), 'qaEncodeAgentNote should indent arrow notes');
 
 console.log('KLIC UI i18n and style import/export roundtrip smoke test passed.');

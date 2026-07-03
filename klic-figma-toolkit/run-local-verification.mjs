@@ -165,6 +165,31 @@ function runWindowsCmdSmokeChecks() {
   }
 }
 
+function resolvePowerShellCommand() {
+  for (const command of ['powershell.exe', 'pwsh']) {
+    const probe = spawnSync(command, ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: 'pipe',
+    });
+    if (probe.error && probe.error.code === 'ENOENT') continue;
+    return command;
+  }
+  return null;
+}
+
+function runPowerShellScript(label, scriptPath) {
+  const command = resolvePowerShellCommand();
+  if (!command) {
+    console.log(`\n[${label}] skipped: PowerShell not found.`);
+    return;
+  }
+  const args = command === 'powershell.exe'
+    ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath]
+    : ['-NoProfile', '-File', scriptPath];
+  run(label, command, args);
+}
+
 const evidencePath = path.join(os.tmpdir(), `klic-smoke-evidence-${process.pid}.json`);
 const capturedMixedEvidencePath = path.join(os.tmpdir(), `klic-captured-mixed-evidence-${process.pid}.json`);
 const styleTokenPath = path.join(os.tmpdir(), `klic-style-tokens-${process.pid}.json`);
@@ -257,7 +282,7 @@ try {
     `figma · API 1.0.0\nClipboard helper text\n${JSON.stringify(forgedFixture, null, 2)}\nend`,
     'fixture',
   );
-  run('folder maker parser', 'powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'folder-maker/Test-FolderMaker.ps1']);
+  runPowerShellScript('folder maker parser', 'folder-maker/Test-FolderMaker.ps1');
   writeStyleTokenPayloadFromMd(styleTokenPath);
   run('style token validator', 'node', ['klic-figma-toolkit/validate-style-token-json.mjs', styleTokenPath]);
   run('code syntax', 'node', ['--check', 'klic-figma-toolkit/code.js']);
