@@ -14,6 +14,9 @@ function assert(condition, message) {
 function findChrome() {
   const candidates = [
     process.env.CHROME_BIN,
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/Applications/Chromium.app/Contents/MacOS/Chromium',
+    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
     '/usr/bin/google-chrome',
     '/usr/bin/chromium',
     '/usr/bin/chromium-browser',
@@ -150,6 +153,7 @@ async function run() {
       awaitPromise: true,
       expression: `
         switchTool('command');
+        setLang('en');
         document.body.offsetHeight;
         true;
       `,

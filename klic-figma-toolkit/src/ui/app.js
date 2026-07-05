@@ -35,9 +35,14 @@ function applyLang() {
   document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
   document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
   document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
+  document.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
   document.documentElement.lang = LANG;
-  document.getElementById('lang-en').classList.toggle('active', LANG === 'en');
-  document.getElementById('lang-ko').classList.toggle('active', LANG === 'ko');
+  const langEn = document.getElementById('lang-en');
+  const langKo = document.getElementById('lang-ko');
+  langEn.classList.toggle('active', LANG === 'en');
+  langKo.classList.toggle('active', LANG === 'ko');
+  langEn.setAttribute('aria-pressed', String(LANG === 'en'));
+  langKo.setAttribute('aria-pressed', String(LANG === 'ko'));
   applyUiSizeState();
   // re-render dynamic bits that depend on language
   commandRenderDynamicI18n();
@@ -54,7 +59,10 @@ function setLang(l) {
 function applyUiSizeState() {
   Object.keys(UI_SIZE_PRESETS).forEach(size => {
     const btn = document.getElementById('size-' + size);
-    if (btn) btn.classList.toggle('active', uiSize === size);
+    if (btn) {
+      btn.classList.toggle('active', uiSize === size);
+      btn.setAttribute('aria-pressed', String(uiSize === size));
+    }
   });
 }
 
@@ -699,27 +707,16 @@ function menuRenderDiagnostics(data) {
   if (!el) return;
   const summary = menuAnalyzeData(data);
   const selected = document.querySelectorAll('.menu-item-check:checked').length;
-  const labels = LANG === 'ko'
-    ? {
-      total: `총 ${summary.total}개`,
-      selected: `선택 ${selected}개`,
-      duplicateNames: `중복 메뉴명 ${summary.duplicateNames}`,
-      duplicatePaths: `중복 경로 ${summary.duplicatePaths}`,
-      emptyNames: `빈 메뉴명 ${summary.emptyNames}`,
-      deepPaths: `깊은 경로 ${summary.deepPaths}`,
-      longNames: `긴 메뉴명 ${summary.longNames}`,
-      clean: '진단 통과',
-    }
-    : {
-      total: `${summary.total} total`,
-      selected: `${selected} selected`,
-      duplicateNames: `${summary.duplicateNames} duplicate names`,
-      duplicatePaths: `${summary.duplicatePaths} duplicate paths`,
-      emptyNames: `${summary.emptyNames} empty names`,
-      deepPaths: `${summary.deepPaths} deep paths`,
-      longNames: `${summary.longNames} long names`,
-      clean: 'Diagnostics passed',
-    };
+  const labels = {
+    total: t('menu.diagTotal', summary.total),
+    selected: t('menu.diagSelected', selected),
+    duplicateNames: t('menu.diagDuplicateNames', summary.duplicateNames),
+    duplicatePaths: t('menu.diagDuplicatePaths', summary.duplicatePaths),
+    emptyNames: t('menu.diagEmptyNames', summary.emptyNames),
+    deepPaths: t('menu.diagDeepPaths', summary.deepPaths),
+    longNames: t('menu.diagLongNames', summary.longNames),
+    clean: t('menu.diagClean'),
+  };
   const warnings = [
     ['duplicateNames', summary.duplicateNames],
     ['duplicatePaths', summary.duplicatePaths],
@@ -1024,7 +1021,7 @@ function menuToggleExcel() {
   const isOpen = sec.style.display !== 'none';
   sec.style.display = isOpen ? 'none' : 'block';
   document.getElementById('menu-excel-toggle').textContent =
-    (isOpen ? '▶ ' : '▼ ') + (LANG === 'ko' ? '엑셀(CSV) 파일에서 불러오기' : 'Load from Excel (CSV)');
+    isOpen ? t('menu.excelToggleCollapsed') : t('menu.excelToggleExpanded');
 }
 
 /* ── Menu events ── */
@@ -1093,7 +1090,7 @@ document.getElementById('menu-apply-csv').addEventListener('click', () => {
   menuApplyData(data);
   menuSetStatus(t('menu.csvOk', data.length), 'ok');
   document.getElementById('menu-excel-section').style.display = 'none';
-  document.getElementById('menu-excel-toggle').textContent = '▶ ' + (LANG === 'ko' ? '엑셀(CSV) 파일에서 불러오기' : 'Load from Excel (CSV)');
+  document.getElementById('menu-excel-toggle').textContent = t('menu.excelToggleCollapsed');
 });
 document.getElementById('menu-filter-add').addEventListener('click', menuAddKeyword);
 document.getElementById('menu-filter').addEventListener('keydown', (e) => { if (e.key === 'Enter') menuAddKeyword(); });
@@ -1329,6 +1326,7 @@ function renderStylePreview(parsed, processed) {
 let styleProcessed = null;
 let styleSelectedFont = null;
 let styleLastFile = null;
+let styleFontSearchSeq = 0;
 
 function styleHashText(text) {
   let hash = 0;
@@ -1376,6 +1374,27 @@ function styleApplyFont(fam) {
   document.getElementById('style-font-label').textContent = t('style.fontSel', fam);
   if (styleProcessed) styleProcessed.fontFamily = fam;
   document.querySelectorAll('.font-result-item').forEach(el => el.classList.toggle('active', el.dataset.fam === fam));
+}
+
+function styleRenderFontSearching() {
+  const container = document.getElementById('style-font-results');
+  container.title = '';
+  container.innerHTML = `<div class="font-result-item" style="color:#555;cursor:default">${t('style.searching')}</div>`;
+}
+
+function styleRenderFontResults(families, cached) {
+  const container = document.getElementById('style-font-results');
+  container.title = cached ? t('style.searchCached') : '';
+  if (!families.length) {
+    container.innerHTML = `<div class="font-result-item" style="color:#555;cursor:default">${t('style.noResult')}</div>`;
+    return;
+  }
+  container.innerHTML = families.map(fam =>
+    `<div class="font-result-item${styleSelectedFont === fam ? ' active' : ''}" data-fam="${fam}">${fam}</div>`
+  ).join('');
+  container.querySelectorAll('.font-result-item[data-fam]').forEach(el => {
+    el.addEventListener('click', () => styleApplyFont(el.dataset.fam));
+  });
 }
 
 function styleParseCurrentMd(showLoadedMessage = false) {
@@ -1458,8 +1477,9 @@ function styleDownloadText(filename, text, type) {
 
 document.getElementById('style-font-search').addEventListener('click', () => {
   const q = document.getElementById('style-font-input').value.trim();
-  document.getElementById('style-font-results').innerHTML = `<div class="font-result-item" style="color:#555;cursor:default">${t('style.searching')}</div>`;
-  parent.postMessage({ pluginMessage: { type: 'style-search-fonts', query: q } }, '*');
+  styleFontSearchSeq++;
+  styleRenderFontSearching();
+  parent.postMessage({ pluginMessage: { type: 'style-search-fonts', query: q, requestId: styleFontSearchSeq } }, '*');
 });
 document.getElementById('style-font-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('style-font-search').click(); });
 
@@ -1729,25 +1749,15 @@ function tableRenderDiagnostics(parts) {
   const el = document.getElementById('table-diagnostics');
   if (!el) return;
   const summary = tableAnalyzeRows(parts);
-  const labels = LANG === 'ko'
-    ? {
-      shape: `${summary.rows}행 × ${summary.columns}열`,
-      split: `헤더 ${summary.headerRows} · 바디 ${summary.bodyRows} · 푸터 ${summary.footerRows}`,
-      inconsistentRows: `열 수 불일치 ${summary.inconsistentRows}`,
-      emptyHeaderCells: `빈 헤더 ${summary.emptyHeaderCells}`,
-      longCells: `긴 셀 ${summary.longCells}`,
-      idle: '데이터 대기',
-      clean: '진단 통과',
-    }
-    : {
-      shape: `${summary.rows} rows × ${summary.columns} cols`,
-      split: `header ${summary.headerRows} · body ${summary.bodyRows} · footer ${summary.footerRows}`,
-      inconsistentRows: `${summary.inconsistentRows} inconsistent rows`,
-      emptyHeaderCells: `${summary.emptyHeaderCells} empty headers`,
-      longCells: `${summary.longCells} long cells`,
-      idle: 'Waiting for data',
-      clean: 'Diagnostics passed',
-    };
+  const labels = {
+    shape: t('table.diagShape', summary.rows, summary.columns),
+    split: t('table.diagSplit', summary.headerRows, summary.bodyRows, summary.footerRows),
+    inconsistentRows: t('table.diagInconsistentRows', summary.inconsistentRows),
+    emptyHeaderCells: t('table.diagEmptyHeaderCells', summary.emptyHeaderCells),
+    longCells: t('table.diagLongCells', summary.longCells),
+    idle: t('table.diagIdle'),
+    clean: t('table.diagClean'),
+  };
   if (!summary.rows) {
     el.innerHTML = `<span class="diagnostic-chip">${labels.idle}</span>`;
     return;
@@ -2050,14 +2060,8 @@ window.onmessage = (event) => {
 
   /* ── Style ── */
   if (msg.type === 'style-font-result') {
-    const container = document.getElementById('style-font-results');
-    if (!msg.families.length) { container.innerHTML = `<div class="font-result-item" style="color:#555;cursor:default">${t('style.noResult')}</div>`; return; }
-    container.innerHTML = msg.families.map(fam =>
-      `<div class="font-result-item${styleSelectedFont === fam ? ' active' : ''}" data-fam="${fam}">${fam}</div>`
-    ).join('');
-    container.querySelectorAll('.font-result-item[data-fam]').forEach(el => {
-      el.addEventListener('click', () => styleApplyFont(el.dataset.fam));
-    });
+    if (msg.requestId && msg.requestId !== styleFontSearchSeq) return;
+    styleRenderFontResults(msg.families || [], msg.cached);
     return;
   }
   if (msg.type === 'style-progress') {
@@ -2085,7 +2089,7 @@ window.onmessage = (event) => {
     ['style-generate', 'style-draw', 'style-comp'].forEach(id => document.getElementById(id).disabled = false);
     document.getElementById('style-progress-wrap').style.display = 'none';
     const el = document.getElementById('style-result');
-    el.textContent = '❌ ' + msg.message;
+    el.textContent = t('style.errPrefix') + msg.message;
     el.className = 'result error'; el.style.display = 'block';
     return;
   }
@@ -2162,7 +2166,23 @@ function qaCanvasToPngBytes(canvas) {
 function qaSetImplImage(bytes, width, height) {
   qaImpl = { bytes, width, height };
   document.getElementById('qa-impl-img').src = qaBytesToObjectUrl(bytes);
+  qaResetImplLabels();
   qaUpdateAgentNote();
+}
+
+function qaSetImplImageResult(message) {
+  const result = document.getElementById('qa-result');
+  if (result) result.textContent = message;
+}
+
+function qaResetImplLabels() {
+  qaLabels = [];
+  qaRenderLabels();
+  qaRedrawOverlay();
+}
+
+function qaSanitizeAgentNoteText(value) {
+  return String(value == null ? '' : value).replace(/```/g, "'''");
 }
 
 function qaClamp01(value) {
@@ -2232,18 +2252,18 @@ function qaEncodeAgentNote(design, impl, labels) {
   }
   items.forEach((label, i) => {
     const kind = label && label.kind === 'point' ? 'point' : label && label.kind === 'arrow' ? 'arrow' : 'rect';
-    const category = label && label.category ? String(label.category) : 'other';
+    const category = qaSanitizeAgentNoteText(label && label.category ? label.category : 'other').replace(/"/g, "'");
     if (kind === 'point') {
       const p = qaPixelPoint(label, implW || 1, implH || 1);
-      lines.push('[' + (i + 1) + '] point (' + p.x + ',' + p.y + ') "' + category.replace(/"/g, "'") + '"');
+      lines.push('[' + (i + 1) + '] point (' + p.x + ',' + p.y + ') "' + category + '"');
     } else if (kind === 'arrow') {
       const a = qaPixelArrow(label, implW || 1, implH || 1);
-      lines.push('[' + (i + 1) + '] arrow (' + a.x1 + ',' + a.y1 + ')->(' + a.x2 + ',' + a.y2 + ') "' + category.replace(/"/g, "'") + '"');
+      lines.push('[' + (i + 1) + '] arrow (' + a.x1 + ',' + a.y1 + ')->(' + a.x2 + ',' + a.y2 + ') "' + category + '"');
     } else {
       const r = qaPixelRect(label, implW || 1, implH || 1);
-      lines.push('[' + (i + 1) + '] rect (' + r.x1 + ',' + r.y1 + ')-(' + r.x2 + ',' + r.y2 + ') "' + category.replace(/"/g, "'") + '"');
+      lines.push('[' + (i + 1) + '] rect (' + r.x1 + ',' + r.y1 + ')-(' + r.x2 + ',' + r.y2 + ') "' + category + '"');
     }
-    const note = String((label && label.note) || '').replace(/\s+$/, '');
+    const note = qaSanitizeAgentNoteText((label && label.note) || '').replace(/\s+$/, '');
     if (note) {
       note.split(/\r?\n/).forEach((line) => {
         lines.push('    ' + line);
@@ -2308,7 +2328,8 @@ function qaRenderLabels() {
     cat.addEventListener('change', () => { label.category = cat.value; qaUpdateAgentNote(); });
     const del = document.createElement('button');
     del.className = 'link-btn'; del.textContent = '×';
-    del.title = 'Remove';
+    del.title = t('designqa.removeLabel');
+    del.setAttribute('aria-label', t('designqa.removeLabel'));
     del.addEventListener('click', () => { qaLabels.splice(i, 1); qaRedrawOverlay(); qaRenderLabels(); });
     row.appendChild(num); row.appendChild(note); row.appendChild(cat); row.appendChild(del);
     list.appendChild(row);
@@ -2441,6 +2462,7 @@ function qaLoadImplFile(file) {
       const plan = qaPlanImageScale(probe.naturalWidth, probe.naturalHeight);
       if (plan.factor === 1) {
         qaSetImplImage(bytes, plan.width, plan.height);
+        qaSetImplImageResult(t('designqa.implLoaded', plan.width, plan.height));
         return;
       }
       const canvas = document.createElement('canvas');
@@ -2449,6 +2471,7 @@ function qaLoadImplFile(file) {
       canvas.getContext('2d').drawImage(probe, 0, 0, plan.width, plan.height);
       qaCanvasToPngBytes(canvas).then((scaledBytes) => {
         qaSetImplImage(scaledBytes, plan.width, plan.height);
+        qaSetImplImageResult(t('designqa.implScaled', probe.naturalWidth, probe.naturalHeight, plan.width, plan.height));
       }).catch(() => {
         document.getElementById('qa-result').textContent = t('designqa.errEncodeFailed');
       });

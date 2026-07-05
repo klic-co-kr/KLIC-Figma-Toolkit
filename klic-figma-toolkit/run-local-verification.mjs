@@ -85,6 +85,9 @@ function runUiScriptSyntaxCheck() {
 function runNodeLauncherChecks() {
   const rootLauncherPath = path.join(repoRoot, 'KLIC-START.cmd');
   const rootLauncher = fs.readFileSync(rootLauncherPath, 'utf8');
+  const macRootLauncherPath = path.join(repoRoot, 'KLIC-START.sh');
+  const macRootLauncher = fs.readFileSync(macRootLauncherPath, 'utf8');
+  const completionAudit = fs.readFileSync(path.join(root, 'run-completion-audit.mjs'), 'utf8');
   const rootLauncherNeedles = [
     'run-local-verification.cmd',
     'capture-runtime-evidence.cmd',
@@ -99,6 +102,81 @@ function runNodeLauncherChecks() {
   ];
   for (const needle of rootLauncherNeedles) {
     if (!rootLauncher.includes(needle)) throw new Error(`KLIC-START.cmd is missing: ${needle}`);
+  }
+  const macRootLauncherNeedles = [
+    'run-local-verification.mjs',
+    'capture-runtime-evidence.sh',
+    'run-completion-audit.sh',
+    'watch-runtime-evidence.mjs',
+    'watch-runtime-clipboard.sh',
+    'watch-runtime-http.sh',
+    'RUNTIME_CHECKLIST.md',
+    'brew install node',
+    'https://nodejs.org/',
+    'https://www.figma.com/downloads/',
+    'open -Ra Figma',
+    'Figma desktop profile:',
+    'Privacy & Security > Accessibility',
+    '--preflight',
+    '--capture-clipboard',
+    '--audit <path>',
+    '--watch-file <path>',
+    '--watch-clipboard',
+    '--watch-http',
+    '--runtime-acceptance',
+    '--wait-accessibility-runtime',
+    '--open-accessibility',
+    '--open-checklist',
+    'wait_for_accessibility_runtime',
+    'KLIC accessibility wait:',
+    'After enabling Accessibility, run ./KLIC-START.sh --check, then rerun ./KLIC-START.sh --wait-accessibility-runtime',
+    'run_runtime_acceptance',
+    'open_figma_desktop',
+    'Figma desktop: open request sent',
+    'open_figma_design_file',
+    'FigmaAgent design file open:',
+    '/figma/desktop/open-url',
+    'https://www.figma.com/design/new',
+    'check_figma_agent_open_url',
+    'FigmaAgent URL-open check:',
+    'try_run_figma_plugin_menu',
+    'run_runtime_acceptance_watchers',
+    'KLIC runtime acceptance: watching localhost HTTP and clipboard evidence.',
+    'KLIC auto menu launch skipped',
+    'open any Figma design file first',
+    'Run Runtime Smoke Evidence',
+    'open_accessibility_settings',
+    'Privacy_Accessibility',
+    'Accessibility permission:',
+    'accessibility_any_granted_clients',
+    'Accessibility permission: no grants found in user TCC database',
+    'accessibility_controller_hint',
+    'Accessibility controller hint:',
+    'apple_events_any_clients',
+    'AppleEvents permission:',
+  ];
+  for (const needle of macRootLauncherNeedles) {
+    if (!macRootLauncher.includes(needle)) throw new Error(`KLIC-START.sh is missing: ${needle}`);
+  }
+  const macMenuBody = (macRootLauncher.match(/run_menu\(\) \{[\s\S]*?read -r -p "Select: "/) || [])[0] || '';
+  const macMenuNeedles = [
+    '6. Watch localhost HTTP for Figma smoke evidence and audit',
+    '7. Open runtime checklist',
+    '8. Check Node.js and Figma desktop readiness',
+    '9. Open macOS Accessibility privacy settings',
+    '10. Run guided Figma runtime acceptance',
+    '11. Wait for Accessibility, then run runtime acceptance',
+  ];
+  for (const needle of macMenuNeedles) {
+    if (!macMenuBody.includes(needle)) throw new Error(`KLIC-START.sh interactive menu is missing: ${needle}`);
+  }
+  const completionAuditNeedles = [
+    'tries to open a new Figma design file through FigmaAgent',
+    'If FigmaAgent does not open a design file',
+    'If Accessibility settings are already open, use ./KLIC-START.sh --wait-accessibility-runtime',
+  ];
+  for (const needle of completionAuditNeedles) {
+    if (!completionAudit.includes(needle)) throw new Error(`run-completion-audit.mjs runtime guidance is missing: ${needle}`);
   }
 
   const launchers = [
@@ -115,6 +193,21 @@ function runNodeLauncherChecks() {
     const text = fs.readFileSync(filePath, 'utf8');
     if (!text.includes('where node')) throw new Error(`${launcher} does not check whether Node.js is installed.`);
     if (!text.includes('winget install OpenJS.NodeJS.LTS')) throw new Error(`${launcher} is missing Windows Node.js install guidance.`);
+    if (!text.includes('https://nodejs.org/')) throw new Error(`${launcher} is missing Node.js download guidance.`);
+  }
+
+  const macLaunchers = [
+    'capture-runtime-evidence.sh',
+    'run-completion-audit.sh',
+    'watch-runtime-clipboard.sh',
+    'watch-runtime-http.sh',
+  ];
+  for (const launcher of macLaunchers) {
+    const filePath = path.join(root, launcher);
+    const text = fs.readFileSync(filePath, 'utf8');
+    if (!text.startsWith('#!/usr/bin/env bash')) throw new Error(`${launcher} is missing a bash shebang.`);
+    if (!text.includes('command -v node')) throw new Error(`${launcher} does not check whether Node.js is installed.`);
+    if (!text.includes('brew install node')) throw new Error(`${launcher} is missing Homebrew Node.js install guidance.`);
     if (!text.includes('https://nodejs.org/')) throw new Error(`${launcher} is missing Node.js download guidance.`);
   }
   console.log('Node.js launcher guidance check passed.');
@@ -163,6 +256,19 @@ function runWindowsCmdSmokeChecks() {
   } finally {
     fs.rmSync(caseDir, { recursive: true, force: true });
   }
+}
+
+function runMacShellSmokeChecks() {
+  if (process.platform === 'win32') {
+    console.log('macOS/Linux shell smoke checks skipped: Windows platform.');
+    return;
+  }
+  run('capture runtime evidence sh help', 'bash', ['klic-figma-toolkit/capture-runtime-evidence.sh', '--help']);
+  run('completion audit sh help', 'bash', ['klic-figma-toolkit/run-completion-audit.sh', '--help']);
+  run('clipboard watcher sh help', 'bash', ['klic-figma-toolkit/watch-runtime-clipboard.sh', '--help']);
+  run('http receiver sh help', 'bash', ['klic-figma-toolkit/watch-runtime-http.sh', '--help']);
+  run('root launcher sh help', 'bash', ['KLIC-START.sh', '--help']);
+  run('root launcher sh readiness check', 'bash', ['KLIC-START.sh', '--check']);
 }
 
 function resolvePowerShellCommand() {
@@ -295,10 +401,13 @@ try {
   run('completion audit syntax', 'node', ['--check', 'klic-figma-toolkit/run-completion-audit.mjs']);
   run('runtime evidence watcher syntax', 'node', ['--check', 'klic-figma-toolkit/watch-runtime-evidence.mjs']);
   run('runtime evidence clipboard watcher syntax', 'node', ['--check', 'klic-figma-toolkit/watch-runtime-clipboard.mjs']);
+  run('runtime evidence HTTP receiver syntax', 'node', ['--check', 'klic-figma-toolkit/watch-runtime-http.mjs']);
   run('runtime evidence capture syntax', 'node', ['--check', 'klic-figma-toolkit/capture-runtime-evidence.mjs']);
+  run('runtime evidence HTTP receiver self-test', 'node', ['klic-figma-toolkit/watch-runtime-http.mjs', '--self-test']);
   runUiScriptSyntaxCheck();
   runNodeLauncherChecks();
   runWindowsCmdSmokeChecks();
+  runMacShellSmokeChecks();
   console.log('\nKLIC local verification passed.');
 } finally {
   if (fs.existsSync(evidencePath)) fs.unlinkSync(evidencePath);

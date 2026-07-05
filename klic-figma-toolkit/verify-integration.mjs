@@ -6,6 +6,7 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 const manifestPath = path.join(root, 'manifest.json');
 const codePath = path.join(root, 'code.js');
 const runtimeChecklistPath = path.join(root, 'RUNTIME_CHECKLIST.md');
+const acceptanceStatusPath = path.join(root, 'ACCEPTANCE_STATUS.md');
 const mockRuntimePath = path.join(root, 'run-smoke-test-mock.mjs');
 const sourceSplitCheckPath = path.join(root, 'run-source-split-check.mjs');
 const buildToolkitPath = path.join(root, 'build-toolkit.mjs');
@@ -14,10 +15,12 @@ const uiVisualSmokePath = path.join(root, 'run-ui-visual-smoke.mjs');
 const completionAuditPath = path.join(root, 'run-completion-audit.mjs');
 const runtimeEvidenceWatcherPath = path.join(root, 'watch-runtime-evidence.mjs');
 const runtimeEvidenceClipboardWatcherPath = path.join(root, 'watch-runtime-clipboard.mjs');
+const runtimeEvidenceHttpWatcherPath = path.join(root, 'watch-runtime-http.mjs');
 const smokeEvidenceValidatorPath = path.join(root, 'validate-smoke-evidence.mjs');
 const styleTokenValidatorPath = path.join(root, 'validate-style-token-json.mjs');
 const localVerificationPath = path.join(root, 'run-local-verification.mjs');
 const styleGuideViewerPath = path.join(root, '..', 'style-guide-viewer_ver2.md');
+const macRootLauncherPath = path.join(root, '..', 'KLIC-START.sh');
 
 function assert(condition, message) {
   if (!condition) {
@@ -43,6 +46,12 @@ assert(manifest.ui === 'ui.html', `unexpected manifest.ui: ${manifest.ui}`);
 assert(Array.isArray(manifest.editorType) && manifest.editorType.includes('figma'), 'manifest.editorType must include figma');
 assert(manifest.documentAccess === 'dynamic-page', 'manifest.documentAccess must be dynamic-page for current Figma plugin loading');
 assert(
+  Array.isArray(manifest.menu)
+    && manifest.menu.some((item) => item.name === 'Open Toolkit' && item.command === 'open-toolkit')
+    && manifest.menu.some((item) => item.name === 'Run Runtime Smoke Evidence' && item.command === 'run-smoke-evidence'),
+  'manifest.menu must expose Open Toolkit and Run Runtime Smoke Evidence commands',
+);
+assert(
   manifest.networkAccess
     && Array.isArray(manifest.networkAccess.allowedDomains)
     && manifest.networkAccess.allowedDomains.includes('*')
@@ -55,6 +64,7 @@ assert(fs.existsSync(uiPath), `manifest.ui target is missing: ${manifest.ui}`);
 
 const ui = fs.readFileSync(uiPath, 'utf8');
 assert(fs.existsSync(runtimeChecklistPath), 'runtime checklist is missing: RUNTIME_CHECKLIST.md');
+assert(fs.existsSync(acceptanceStatusPath), 'acceptance status handoff is missing: ACCEPTANCE_STATUS.md');
 assert(fs.existsSync(mockRuntimePath), 'mock runtime smoke test is missing: run-smoke-test-mock.mjs');
 assert(fs.existsSync(sourceSplitCheckPath), 'source split check is missing: run-source-split-check.mjs');
 assert(fs.existsSync(buildToolkitPath), 'toolkit build script is missing: build-toolkit.mjs');
@@ -63,15 +73,18 @@ assert(fs.existsSync(uiVisualSmokePath), 'UI visual smoke test is missing: run-u
 assert(fs.existsSync(completionAuditPath), 'completion audit runner is missing: run-completion-audit.mjs');
 assert(fs.existsSync(runtimeEvidenceWatcherPath), 'runtime evidence watcher is missing: watch-runtime-evidence.mjs');
 assert(fs.existsSync(runtimeEvidenceClipboardWatcherPath), 'runtime evidence clipboard watcher is missing: watch-runtime-clipboard.mjs');
+assert(fs.existsSync(runtimeEvidenceHttpWatcherPath), 'runtime evidence HTTP receiver is missing: watch-runtime-http.mjs');
 assert(fs.existsSync(smokeEvidenceValidatorPath), 'smoke evidence validator is missing: validate-smoke-evidence.mjs');
 assert(fs.existsSync(styleTokenValidatorPath), 'style token JSON validator is missing: validate-style-token-json.mjs');
 assert(fs.existsSync(localVerificationPath), 'local verification runner is missing: run-local-verification.mjs');
 assert(fs.existsSync(styleGuideViewerPath), 'style-guide-viewer_ver2.md is missing');
+assert(fs.existsSync(macRootLauncherPath), 'macOS/Linux root launcher is missing: KLIC-START.sh');
 assert(fs.existsSync(folderMakerProtocolInstallerPath), 'Folder Maker protocol installer is missing');
 assert(fs.existsSync(folderMakerProtocolUninstallerPath), 'Folder Maker protocol uninstaller is missing');
 assert(fs.existsSync(folderMakerBridgePath), 'Folder Maker local bridge script is missing');
 assert(fs.existsSync(folderMakerBridgeCmdPath), 'Folder Maker local bridge command wrapper is missing');
 const runtimeChecklist = fs.readFileSync(runtimeChecklistPath, 'utf8');
+const acceptanceStatus = fs.readFileSync(acceptanceStatusPath, 'utf8');
 const mockRuntime = fs.readFileSync(mockRuntimePath, 'utf8');
 const sourceSplitCheck = fs.readFileSync(sourceSplitCheckPath, 'utf8');
 const buildToolkit = fs.readFileSync(buildToolkitPath, 'utf8');
@@ -80,13 +93,27 @@ const uiVisualSmoke = fs.readFileSync(uiVisualSmokePath, 'utf8');
 const completionAudit = fs.readFileSync(completionAuditPath, 'utf8');
 const runtimeEvidenceWatcher = fs.readFileSync(runtimeEvidenceWatcherPath, 'utf8');
 const runtimeEvidenceClipboardWatcher = fs.readFileSync(runtimeEvidenceClipboardWatcherPath, 'utf8');
+const runtimeEvidenceHttpWatcher = fs.readFileSync(runtimeEvidenceHttpWatcherPath, 'utf8');
 const smokeEvidenceValidator = fs.readFileSync(smokeEvidenceValidatorPath, 'utf8');
 const styleTokenValidator = fs.readFileSync(styleTokenValidatorPath, 'utf8');
 const localVerification = fs.readFileSync(localVerificationPath, 'utf8');
 const styleGuideViewer = fs.readFileSync(styleGuideViewerPath, 'utf8');
 const folderMakerProtocolInstaller = fs.readFileSync(folderMakerProtocolInstallerPath, 'utf8');
+const readme = fs.readFileSync(path.join(root, '..', 'README.md'), 'utf8');
+const macRootLauncher = fs.readFileSync(macRootLauncherPath, 'utf8');
 
 assert(code.includes("figma.showUI(__html__"), 'code.js does not render the manifest UI with figma.showUI(__html__)');
+assert(
+  code.includes("var KLIC_RUNTIME_SMOKE_COMMAND = 'run-smoke-evidence'")
+    && code.includes('figma.command === KLIC_RUNTIME_SMOKE_COMMAND'),
+  'code.js must support the manifest runtime smoke evidence command',
+);
+assert(
+  code.includes('commandPostSmokeEvidence')
+    && code.includes('commandMaybeRunLocalSmokeEvidence')
+    && code.includes('http://127.0.0.1:51337/klic-figma-smoke-evidence'),
+  'code.js must POST runtime smoke evidence to the local audit receiver and auto-detect a waiting receiver',
+);
 assert(code.includes('Generated by klic-figma-toolkit/build-toolkit.mjs'), 'code.js should be generated from split source files');
 assert(ui.includes('Generated by klic-figma-toolkit/build-toolkit.mjs'), 'ui.html should be generated from split source files');
 assert(buildToolkit.includes('src/ui/i18n.js') && buildToolkit.includes('src/code/10-command-center.js'), 'build script should assemble split UI/code sources');
@@ -98,6 +125,12 @@ assert(ui.includes('<title>KLIC Figma Toolkit</title>'), 'ui.html document title
 assert(ui.includes('<span class="brand">KLIC Figma Toolkit</span>'), 'ui.html brand label must match the manifest/plugin name');
 assert(ui.includes('function resizeUi') && ui.includes('UI_SIZE_PRESETS') && ui.includes('klic.uiSize'), 'ui.html must expose persisted UI size presets');
 assert(ui.includes('id="size-compact"') && ui.includes('id="size-default"') && ui.includes('id="size-wide"'), 'ui.html is missing size preset controls');
+assert(!ui.includes('aria-label="Panel size"'), 'Panel size aria-label must be dictionary-backed for i18n');
+assert(ui.includes('data-i18n-aria="ui.sizeGroup"'), 'Panel size control must expose a localized aria-label key');
+assert(ui.includes('querySelectorAll(\'[data-i18n-aria]\')'), 'applyLang must localize aria-label attributes');
+assert(ui.includes("setAttribute('aria-pressed', String(uiSize === size))"), 'UI size preset buttons must expose aria-pressed state');
+assert(ui.includes("setAttribute('aria-pressed', String(LANG === 'en'))"), 'English language button must expose aria-pressed state');
+assert(ui.includes("setAttribute('aria-pressed', String(LANG === 'ko'))"), 'Korean language button must expose aria-pressed state');
 assert(!ui.includes('class="command-header"'), 'Command Center should not render a redundant inner product/mode header');
 assert(ui.includes('id="tool-qa"') && ui.includes('id="pane-qa"'), 'QA should be a top-level tool tab');
 assert(ui.includes('id="tool-handoff"') && ui.includes('id="pane-handoff"'), 'Handoff should be a top-level tool tab');
@@ -133,13 +166,28 @@ function extractStyleGuideParser(uiText) {
   return Function(`${parserBlock}\n${processMatch[0]}\nreturn { parseMD, styleProcessData };`)();
 }
 
-const i18nKeys = Array.from(ui.matchAll(/data-i18n(?:-ph|-html|-title)?="([^"]+)"/g)).map((match) => match[1]);
+const i18nKeys = Array.from(ui.matchAll(/data-i18n(?:-ph|-html|-title|-aria)?="([^"]+)"/g)).map((match) => match[1]);
+assert(i18nKeys.includes('ui.sizeGroup'), 'static i18n key coverage must include data-i18n-aria attributes');
 const enI18n = (ui.match(/en:\s*\{([\s\S]*?)\n\s*\},\n\s*ko:/) || [])[1] || '';
 const koI18n = (ui.match(/ko:\s*\{([\s\S]*?)\n\};/) || [])[1] || '';
+const uiSource = fs.readFileSync(path.join(root, 'src', 'ui', 'app.js'), 'utf8');
+const uiI18nSource = fs.readFileSync(path.join(root, 'src', 'ui', 'i18n.js'), 'utf8');
+const i18nDictionary = Function(`${uiI18nSource}\nreturn I18N;`)();
+const enKeys = Object.keys(i18nDictionary.en);
+const koKeys = Object.keys(i18nDictionary.ko);
+const missingKoKeys = enKeys.filter((key) => !(key in i18nDictionary.ko));
+const missingEnKeys = koKeys.filter((key) => !(key in i18nDictionary.en));
+const typeMismatchKeys = enKeys.filter((key) => key in i18nDictionary.ko && typeof i18nDictionary.en[key] !== typeof i18nDictionary.ko[key]);
 for (const key of new Set(i18nKeys)) {
   assert(enI18n.includes(`'${key}'`), `en i18n dictionary is missing key: ${key}`);
   assert(koI18n.includes(`'${key}'`), `ko i18n dictionary is missing key: ${key}`);
 }
+assert(missingKoKeys.length === 0, `ko i18n dictionary is missing keys present in en: ${missingKoKeys.join(', ')}`);
+assert(missingEnKeys.length === 0, `en i18n dictionary is missing keys present in ko: ${missingEnKeys.join(', ')}`);
+assert(enKeys.length === koKeys.length, 'I18N dictionary parity count mismatch between en and ko');
+assert(typeMismatchKeys.length === 0, `I18N dictionary value type mismatch between en and ko: ${typeMismatchKeys.join(', ')}`);
+assert(!uiSource.includes("LANG === 'ko' ?"), 'UI source must not branch on LANG for user-facing strings; use I18N keys');
+assert(!uiSource.includes("el.textContent = '❌ ' + msg.message"), 'Style error output must use an i18n-backed prefix instead of a direct textContent literal');
 assert(ui.includes('function safeStorageGet') && ui.includes('function safeStorageSet'), 'language persistence should guard blocked localStorage in Figma iframes');
 assert(ui.includes('safeStorageGet(\'klic.lang\')') && ui.includes('safeStorageSet(\'klic.lang\', LANG)'), 'language selection is not persisted through the safe storage wrapper');
 assert(ui.includes('document.documentElement.lang'), 'language selection does not update the document lang attribute');
@@ -394,9 +442,28 @@ assert(uiRoundtripSmoke.includes('smoke evidence runtime badge should render'), 
 assert(ui.includes('runtime.kind') && ui.includes('runtime.editorType') && ui.includes('runtime.apiVersion'), 'ui.html should render smoke evidence runtime metadata');
 assert(uiVisualSmoke.includes('semantic preview has overlapping layout boxes'), 'UI visual smoke test should detect semantic preview overlap');
 assert(uiVisualSmoke.includes('Page.captureScreenshot'), 'UI visual smoke test should support screenshot evidence');
+assert(uiVisualSmoke.includes('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'), 'UI visual smoke test should detect Google Chrome installed as a macOS app bundle');
 assert(uiVisualSmoke.includes("switchTool('style')"), 'UI visual smoke test should open the Style Guide pane');
 assert(uiVisualSmoke.includes("document.getElementById('lang-ko').click()"), 'UI visual smoke test should verify language button clicks');
 assert(uiVisualSmoke.includes('language click should localize Style Guide title'), 'UI visual smoke test should cover localized text after language clicks');
+assert(readme.includes('font search cache'), 'README should document the Style Guide font search cache');
+assert(readme.includes('i18n dictionary parity'), 'README should document i18n dictionary parity verification');
+assert(readme.includes('Figma Context7 lookup performance'), 'README should document the Figma Context7 lookup performance mapping');
+assert(readme.includes('Feature improvements'), 'README should document the feature improvements delivered for this objective');
+assert(readme.includes('UX improvements'), 'README should document the UX improvements delivered for this objective');
+assert(readme.includes('./KLIC-START.sh'), 'README should document the macOS/Linux root launcher');
+assert([
+  '#!/usr/bin/env bash',
+  'run-local-verification.mjs',
+  'capture-runtime-evidence.sh',
+  'run-completion-audit.sh',
+  'watch-runtime-evidence.mjs',
+  'watch-runtime-clipboard.sh',
+  'watch-runtime-http.sh',
+  'open -Ra Figma',
+  'https://www.figma.com/downloads/',
+  '--watch-http',
+].every((needle) => macRootLauncher.includes(needle)), 'KLIC-START.sh should expose macOS/Linux runtime workflows and Figma readiness guidance');
 assert(/\.semantic-row\s*\{[\s\S]*?display:\s*grid;/.test(ui), 'semantic color rows should use a non-overlapping grid layout');
 assert(ui.includes('grid-template-columns: repeat(4, minmax(44px, 1fr))'), 'semantic color chips should use four stable responsive columns');
 assert(ui.includes('overflow-wrap: anywhere'), 'semantic color names should wrap instead of overlapping swatches');
@@ -405,7 +472,35 @@ assert(completionAudit.includes('--runtime-evidence'), 'completion audit runner 
 assert(completionAudit.includes('--require-figma-runtime'), 'completion audit runner should reject mock runtime smoke evidence');
 assert(completionAudit.includes('actual-figma-runtime-smoke-evidence'), 'completion audit runner should track actual Figma runtime smoke evidence');
 assert(completionAudit.includes('style-semantic-visual-layout'), 'completion audit runner should track semantic visual layout verification');
+assert(completionAudit.includes('font-search-performance'), 'completion audit runner should track Style Guide font search performance');
+assert(completionAudit.includes('figma-context7-lookup-performance'), 'completion audit runner should explicitly track the Figma Context7 lookup performance requirement');
+assert(completionAudit.includes('feature-improvements'), 'completion audit runner should explicitly track the feature-improvements requirement');
+assert(completionAudit.includes('ux-improvements'), 'completion audit runner should explicitly track the UX-improvements requirement');
+assert(completionAudit.includes('dynamic-i18n-guard'), 'completion audit runner should track dynamic i18n guardrails');
+assert(completionAudit.includes('diagnostic-i18n-guard'), 'completion audit runner should track diagnostics i18n guardrails');
+assert(completionAudit.includes('i18n-dictionary-parity'), 'completion audit runner should track full EN/KO i18n dictionary parity');
+assert(completionAudit.includes('i18n-dictionary-type-parity'), 'completion audit runner should track EN/KO i18n value type parity');
+assert(completionAudit.includes('data-i18n(?:-ph|-html|-title|-aria)?'), 'completion audit i18n coverage should include data-i18n-aria attributes');
+assert(completionAudit.includes('macos-runtime-evidence-helpers'), 'completion audit runner should track macOS runtime evidence helpers');
+assert(completionAudit.includes('./klic-figma-toolkit/watch-runtime-http.sh'), 'completion audit missing-evidence guidance should mention the HTTP receiver helper');
+assert(completionAudit.includes('./klic-figma-toolkit/capture-runtime-evidence.sh on macOS/Linux'), 'completion audit missing-evidence guidance should mention macOS/Linux capture helper');
+assert(completionAudit.includes('pbpaste'), 'completion audit should require the macOS clipboard watcher backend');
+assert(completionAudit.includes('wl-paste') && completionAudit.includes('xclip'), 'completion audit should require Linux clipboard watcher backends');
 assert(completionAudit.includes('process.exit(2)'), 'completion audit runner should fail when requirements are missing or unverified');
+assert(localVerification.includes('runMacShellSmokeChecks'), 'local verification should smoke test macOS/Linux shell wrappers');
+assert(localVerification.includes('root launcher sh help') && localVerification.includes('root launcher sh readiness check'), 'local verification should smoke test KLIC-START.sh help and readiness checks');
+assert(runtimeEvidenceClipboardWatcher.includes('pbpaste'), 'clipboard watcher should read macOS clipboard with pbpaste');
+assert(runtimeEvidenceClipboardWatcher.includes('wl-paste') && runtimeEvidenceClipboardWatcher.includes('xclip'), 'clipboard watcher should read Linux clipboards with wl-paste or xclip');
+assert(runtimeEvidenceHttpWatcher.includes('/klic-figma-smoke-evidence'), 'HTTP receiver should listen on the plugin smoke evidence endpoint');
+assert(runtimeEvidenceHttpWatcher.includes('--require-figma-runtime'), 'HTTP receiver should require real Figma runtime evidence');
+assert(runtimeEvidenceHttpWatcher.includes('createSelfTestEvidence') && runtimeEvidenceHttpWatcher.includes('--self-test'), 'HTTP receiver should provide a local self-test');
+assert(runtimeEvidenceHttpWatcher.includes('run-completion-audit.mjs') && runtimeEvidenceHttpWatcher.includes('--runtime-evidence'), 'HTTP receiver should run completion audit after saving evidence');
+assert(runtimeChecklist.includes('Style Guide font search performance'), 'runtime checklist should cover Style Guide font search performance');
+assert(runtimeChecklist.includes('Figma Context7 lookup performance'), 'runtime checklist should cover the Figma Context7 lookup performance mapping');
+assert(runtimeChecklist.includes('Dynamic i18n guard'), 'runtime checklist should cover dynamic i18n guardrails');
+assert(acceptanceStatus.includes('actual-figma-runtime-smoke-evidence'), 'acceptance status should document the remaining real Figma runtime evidence blocker');
+assert(acceptanceStatus.includes('feature-improvements') && acceptanceStatus.includes('ux-improvements'), 'acceptance status should map feature and UX improvements to completion-audit evidence');
+assert(acceptanceStatus.includes('i18n-dictionary-parity') && acceptanceStatus.includes('diagnostic-i18n-guard'), 'acceptance status should map complete i18n review to audit evidence');
 assert(ui.includes("'command.oklchDelta'") && ui.includes("t('command.oklchDelta'"), 'ui.html does not render OKLCH delta details through i18n');
 assert(ui.includes("'command.snapshotGenerated'") && ui.includes("t('command.snapshotGenerated'"), 'ui.html does not render provenance source summaries through i18n');
 assert(ui.includes("'command.exportSummary'") && ui.includes("t('command.exportSummary'"), 'ui.html does not render handoff export summary metrics through i18n');

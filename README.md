@@ -42,6 +42,11 @@ KLIC Figma Toolkit은 디자이너와 개발자가 Figma 내에서 반복 작업
 | 📊 | **Table Builder** | 변수 기반 스타일 적용 테이블 생성 (통합·분리·HTML 입력) |
 | 🧭 | **Design QA** | 선택한 디자인과 구현 스크린샷을 비교하고 agent note 생성 |
 
+### 개선 추적
+
+- **Feature improvements** — Style Guide font search cache, Figma Context7 lookup performance mapping, stale response protection, and macOS/Linux runtime evidence helpers are covered by local verification.
+- **UX improvements** — Style Guide cached-result feedback, Design QA screenshot-reload label reset, localized remove-label controls, and sanitized agent notes are covered by UI roundtrip checks.
+
 <br/>
 
 ### 🎯 Command Center
@@ -94,6 +99,8 @@ CSV 또는 수동 입력으로 다단계 메뉴 구조를 Figma 페이지로 변
 - **변수 생성** — Brand, Semantic, Spacing, Radius 등 89개 토큰을 Figma 로컬 변수로 등록
 - **보드 드로잉** — 색상 스워치, 타이포그래피 스케일, 스페이싱 시각화
 - **컴포넌트 생성** — 버튼(S·M·L / Primary·Secondary·Gray·States), 인풋(S·M)
+- **폰트 검색 최적화** — 플러그인 세션 동안 Figma 폰트 목록을 재사용하는 font search cache로 반복 검색 지연을 줄임
+- **Figma Context7 lookup performance** — Context7로 확인한 Figma Plugin API `listAvailableFontsAsync()` 전체 조회를 세션 1회로 제한하고, 쿼리별 검색은 캐시된 family 목록에서 필터링
 - **JSON 가져오기/내보내기** — 토큰 라운드트립 지원 (MD 원본 + 메타 포함)
 
 <br/>
@@ -129,12 +136,28 @@ CSV 또는 수동 입력으로 다단계 메뉴 구조를 Figma 페이지로 변
 - Figma 데스크탑 앱
 - Node.js (로컬 검증 스크립트 실행용)
 
+macOS/Linux에서는 루트 런처로 준비 상태와 런타임 증거 수집 흐름을 확인할 수 있습니다.
+
+```bash
+./KLIC-START.sh --check
+./KLIC-START.sh --open-accessibility
+./KLIC-START.sh --preflight
+./KLIC-START.sh --runtime-acceptance
+./KLIC-START.sh --wait-accessibility-runtime
+./KLIC-START.sh --watch-http
+./KLIC-START.sh --capture-clipboard
+./KLIC-START.sh --audit path/to/figma-smoke-evidence.json
+```
+
+`--check` reports whether a signed-in Figma Desktop profile is detected, whether macOS Accessibility permission is visible for common terminal apps, and whether AppleEvents permission exists without the required Accessibility grant. If menu automation is blocked, run `--open-accessibility`, allow your terminal app, then restart the terminal. If the Accessibility settings panel is already open and you want the launcher to continue as soon as permission is granted, run `--wait-accessibility-runtime`. For final evidence capture, `--runtime-acceptance` opens Figma Desktop, tries to open a new design file through FigmaAgent, combines readiness output with localhost HTTP and clipboard evidence watchers, tries the Figma plugin menu automatically when Accessibility is granted, and prints the exact manual Figma Desktop menu step otherwise. If FigmaAgent cannot open the new design file, the manual path still needs any Figma design file open before using `Plugins > Development`.
+
 ### 플러그인 설치
 
 1. Figma 데스크탑 앱 실행
 2. **Plugins → Development → Import plugin from manifest...**
 3. `klic-figma-toolkit/manifest.json` 선택
 4. 플러그인 메뉴에서 **KLIC Figma Toolkit** 실행
+5. 최종 런타임 증거가 필요할 때는 수신기를 켠 상태에서 **Plugins → Development → Run Runtime Smoke Evidence**를 실행하거나, Command Center에서 **Run smoke test** 후 evidence JSON을 복사합니다.
 
 > Figma에서 실행하기 전에 아래 로컬 검증을 먼저 통과시키세요.
 
@@ -149,13 +172,17 @@ CSV 또는 수동 입력으로 다단계 메뉴 구조를 Figma 페이지로 변
 ```bash
 # 커밋 전 필수 — 전체 프리플라이트
 node klic-figma-toolkit/run-local-verification.mjs
+
+# macOS/Linux 런처 메뉴 또는 비대화형 실행
+./KLIC-START.sh
+./KLIC-START.sh --preflight
 ```
 
 프리플라이트는 다음 게이트를 순서대로 실행합니다:
 
 | 스크립트 | 검증 항목 |
 |---|---|
-| `verify-integration.mjs` | 메시지 타입 계약, i18n 키 완전성, 임베드 MD 일치 여부 |
+| `verify-integration.mjs` | 메시지 타입 계약, i18n key coverage, i18n dictionary parity, 임베드 MD 일치 여부 |
 | `run-ui-roundtrip-smoke.mjs` | 스타일 가이드 JSON 내보내기/가져오기 라운드트립, EN/KO DOM, Design QA agent note 인코딩 |
 | `run-smoke-test-mock.mjs` | 변수 API 비동기 래퍼, OKLCH 정책, 출처 요약, 핸드오프 내보내기, Design QA 보드 생성 |
 | `validate-smoke-evidence.mjs` | 런타임 스모크 증거 JSON 구조 검증 |
@@ -172,6 +199,7 @@ node klic-figma-toolkit/validate-smoke-evidence.mjs path/to/smoke-evidence.json
 node klic-figma-toolkit/validate-style-token-json.mjs path/to/tokens.json
 
 # 최종 완료 감사 (실제 Figma 런타임 증거 필요)
+./KLIC-START.sh --runtime-acceptance
 node klic-figma-toolkit/run-completion-audit.mjs --runtime-evidence path/to/smoke-evidence.json
 ```
 

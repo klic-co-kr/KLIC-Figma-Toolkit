@@ -1012,7 +1012,35 @@ async function createCommandReportBoard(msg) {
   }
 }
 
-async function runCommandSmokeTest() {
+var KLIC_SMOKE_EVIDENCE_RECEIVER_URL = 'http://127.0.0.1:51337/klic-figma-smoke-evidence';
+
+async function commandPostSmokeEvidence(evidence) {
+  if (typeof fetch !== 'function') throw new Error('fetch is not available in this Figma runtime.');
+  var res = await fetch(KLIC_SMOKE_EVIDENCE_RECEIVER_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(evidence),
+  });
+  if (!res || !res.ok) {
+    throw new Error('Local smoke evidence receiver rejected the evidence.');
+  }
+  return true;
+}
+
+async function commandMaybeRunLocalSmokeEvidence() {
+  if (typeof fetch !== 'function') return false;
+  try {
+    var ready = await fetch(KLIC_SMOKE_EVIDENCE_RECEIVER_URL, { method: 'GET' });
+    if (!ready || !ready.ok) return false;
+    await runCommandSmokeTest({ postToLocalhost: true });
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+async function runCommandSmokeTest(options) {
+  options = options || {};
   try {
     var smokeChecks = [];
     function addSmokeCheck(name, passed, detail) {
@@ -1195,6 +1223,15 @@ async function runCommandSmokeTest() {
       reportNodeId: report.id,
       variableId: variable.id,
     });
+    if (options.postToLocalhost) {
+      try {
+        await commandPostSmokeEvidence(smokeEvidence);
+        figma.notify('KLIC smoke evidence sent to local audit receiver.');
+      } catch (postErr) {
+        figma.notify('KLIC smoke evidence was generated, but local receiver capture failed.');
+        figma.ui.postMessage({ type: 'command-error', message: postErr.message || String(postErr) });
+      }
+    }
   } catch (err) {
     figma.ui.postMessage({ type: 'command-smoke-test-result', passed: false, message: err.message || String(err) });
   }

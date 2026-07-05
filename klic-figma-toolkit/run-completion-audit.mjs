@@ -66,6 +66,16 @@ function printHelp() {
 This is stricter than local preflight. It runs local verification and then validates
 the smoke evidence copied from the real Figma desktop runtime.
 
+Preferred macOS/Linux capture flow:
+  ./KLIC-START.sh --runtime-acceptance
+
+If Accessibility settings are already open, use:
+  ./KLIC-START.sh --wait-accessibility-runtime
+
+Then open the plugin in Figma desktop. If the Figma evidence JSON is on the clipboard, run:
+  klic-figma-toolkit\\capture-runtime-evidence.cmd
+  ./klic-figma-toolkit/capture-runtime-evidence.sh
+
 Options:
   --runtime-evidence <path>  JSON copied from the Command Center runtime smoke test
   --skip-local              Skip local preflight rerun, for debugging only
@@ -110,8 +120,17 @@ const smokeEvidenceValidatorCmd = read('klic-figma-toolkit/validate-smoke-eviden
 const styleTokenValidatorCmd = read('klic-figma-toolkit/validate-style-token-json.cmd');
 const runtimeEvidenceWatcherCmd = read('klic-figma-toolkit/watch-runtime-evidence.cmd');
 const runtimeEvidenceClipboardWatcherCmd = read('klic-figma-toolkit/watch-runtime-clipboard.cmd');
+const runtimeEvidenceClipboardWatcher = read('klic-figma-toolkit/watch-runtime-clipboard.mjs');
+const runtimeEvidenceHttpWatcher = read('klic-figma-toolkit/watch-runtime-http.mjs');
+const runtimeEvidenceSh = read('klic-figma-toolkit/capture-runtime-evidence.sh');
+const completionAuditSh = read('klic-figma-toolkit/run-completion-audit.sh');
+const runtimeEvidenceClipboardWatcherSh = read('klic-figma-toolkit/watch-runtime-clipboard.sh');
+const runtimeEvidenceHttpWatcherSh = read('klic-figma-toolkit/watch-runtime-http.sh');
+const macRootLauncherSh = read('KLIC-START.sh');
 const rootLauncherCmd = read('KLIC-START.cmd');
 const runtimeChecklist = read('klic-figma-toolkit/RUNTIME_CHECKLIST.md');
+const acceptanceStatus = read('klic-figma-toolkit/ACCEPTANCE_STATUS.md');
+const readme = read('README.md');
 const folderMakerScript = read('folder-maker/Create-Folders.ps1');
 const folderMakerGui = read('folder-maker/Folder-Maker-GUI.ps1');
 const folderMakerReadme = read('folder-maker/README.md');
@@ -127,6 +146,35 @@ const folderMakerProtocolUninstaller = read('folder-maker/uninstall-protocol.cmd
 const sampleCsvExists = fs.existsSync(path.join(repoRoot, '메뉴샘플.csv'));
 const styleGuideExists = fs.existsSync(path.join(repoRoot, 'style-guide-viewer_ver2.md'));
 
+function getI18nParity() {
+  try {
+    const dictionary = Function(`${uiI18nSource}\nreturn I18N;`)();
+    const enKeys = Object.keys(dictionary.en);
+    const koKeys = Object.keys(dictionary.ko);
+    const missingKo = enKeys.filter((key) => !(key in dictionary.ko));
+    const missingEn = koKeys.filter((key) => !(key in dictionary.en));
+    const typeMismatches = enKeys.filter((key) => key in dictionary.ko && typeof dictionary.en[key] !== typeof dictionary.ko[key]);
+    return {
+      passed: missingKo.length === 0 && missingEn.length === 0 && typeMismatches.length === 0 && enKeys.length === koKeys.length,
+      enCount: enKeys.length,
+      koCount: koKeys.length,
+      missingKo,
+      missingEn,
+      typeMismatches,
+    };
+  } catch (err) {
+    return {
+      passed: false,
+      enCount: 0,
+      koCount: 0,
+      missingKo: [`parse-failed: ${err.message || String(err)}`],
+      missingEn: [],
+      typeMismatches: [],
+    };
+  }
+}
+
+const i18nParity = getI18nParity();
 const checks = [];
 
 add(
@@ -443,13 +491,269 @@ add(
 add(
   checks,
   'i18n',
-  'UI i18n covers static labels, placeholders, HTML/title localized content, language persistence, and dynamic rerenders.',
+  'UI i18n covers static labels, placeholders, HTML/title/aria localized content, language persistence, and dynamic rerenders.',
   'ui.html I18N/applyLang/setLang/safeStorage, verify-integration.mjs i18n key checks, run-ui-roundtrip-smoke.mjs EN/KO DOM checks, run-ui-visual-smoke.mjs language click checks',
   hasAll(ui, ['const I18N', 'safeStorageGet', 'safeStorageSet', 'document.documentElement.lang', 'commandRenderDynamicI18n'])
-    && hasAll(verifier, ['data-i18n(?:-ph|-html|-title)?', 'en i18n dictionary is missing key', 'ko i18n dictionary is missing key'])
+    && hasAll(verifier, ['data-i18n(?:-ph|-html|-title|-aria)?', 'en i18n dictionary is missing key', 'ko i18n dictionary is missing key'])
     && hasAll(uiRoundtrip, ['English style.exportJson label did not render', 'Korean style.exportJson label did not render'])
     && hasAll(uiVisualSmoke, ['language click should switch document lang to ko', 'language click should localize Style Guide title']),
   'i18n implementation or DOM-level i18n verification is incomplete.',
+);
+
+add(
+  checks,
+  'i18n-dictionary-parity',
+  'English and Korean i18n dictionaries contain the same complete key set, including dynamic-only strings not referenced by static data-i18n attributes.',
+  `src/ui/i18n.js evaluated key sets, verify-integration.mjs parity assertions, en=${i18nParity.enCount}, ko=${i18nParity.koCount}`,
+  i18nParity.passed
+    && verifier.includes('ko i18n dictionary is missing keys present in en')
+    && verifier.includes('en i18n dictionary is missing keys present in ko')
+    && verifier.includes('I18N dictionary parity count mismatch'),
+  `Missing in ko: ${i18nParity.missingKo.join(', ') || 'none'}; missing in en: ${i18nParity.missingEn.join(', ') || 'none'}`,
+);
+
+add(
+  checks,
+  'i18n-dictionary-type-parity',
+  'English and Korean i18n values use matching value types for every shared key, so dynamic formatter functions cannot accidentally become static strings in one locale.',
+  'src/ui/i18n.js evaluated key value types, verify-integration.mjs type parity assertion',
+  i18nParity.passed
+    && i18nParity.typeMismatches.length === 0
+    && verifier.includes('I18N dictionary value type mismatch between en and ko'),
+  `Type mismatches: ${i18nParity.typeMismatches.join(', ') || 'none'}`,
+);
+
+add(
+  checks,
+  'font-search-performance',
+  'Style Guide font search reuses one Figma font-list lookup per plugin session, echoes request ids, and prevents stale UI responses from overwriting newer search results.',
+  'src/code/30-style-guide.js styleFontFamiliesCache/styleGetFontFamilies, src/code/00-bootstrap.js requestId routing, src/ui/app.js styleFontSearchSeq/stale guard, run-smoke-test-mock.mjs listAvailableFontsCallCount regression, run-ui-roundtrip-smoke.mjs source assertions',
+  hasAll(codeStyleSource, [
+    'styleFontFamiliesCache',
+    'styleFontFamiliesInflight',
+    'function styleGetFontFamilies',
+    'figma.listAvailableFontsAsync().then',
+    'requestId: requestId',
+    'cached: cached',
+  ])
+    && code.includes('searchFonts(msg.query, msg.requestId)')
+    && hasAll(uiAppSource, [
+      'let styleFontSearchSeq = 0',
+      'function styleRenderFontSearching',
+      'function styleRenderFontResults',
+      'requestId: styleFontSearchSeq',
+      'msg.requestId !== styleFontSearchSeq',
+      "t('style.searchCached')",
+    ])
+    && hasAll(uiI18nSource, [
+      "'style.searchCached': 'Font list cached for this plugin session.'",
+      "'style.searchCached': '이 플러그인 세션에서 폰트 목록을 캐시했습니다.'",
+    ])
+    && hasAll(mockRuntime, [
+      'let listAvailableFontsCallCount = 0',
+      'style font search should echo requestId',
+      'style font search should filter cached families',
+      'style font search should call listAvailableFontsAsync once per plugin session',
+    ])
+    && hasAll(uiRoundtrip, [
+      'Style font search should track request sequence',
+      'Style font search should render results through a helper',
+      'Style font search should send requestId',
+      'Style font search should ignore stale results',
+      'i18n missing style.searchCached key',
+    ]),
+  'Font search cache, stale response guard, localization, or regression coverage is incomplete.',
+);
+
+add(
+  checks,
+  'figma-context7-lookup-performance',
+  'The user-requested Figma Context7 lookup performance improvement is mapped to the Figma Plugin API font-list lookup: one listAvailableFontsAsync call per plugin session, then local cached family filtering.',
+  'README.md Context7 mapping, RUNTIME_CHECKLIST.md manual step, src/code/30-style-guide.js cached listAvailableFontsAsync lookup, run-smoke-test-mock.mjs one-call regression',
+  hasAll(readme, [
+    'Figma Context7 lookup performance',
+    'font search cache',
+    'listAvailableFontsAsync()',
+  ])
+    && hasAll(runtimeChecklist, [
+      'Figma Context7 lookup performance',
+      'figma-context7-lookup-performance',
+      'listAvailableFontsAsync()',
+    ])
+    && hasAll(codeStyleSource, [
+      'styleFontFamiliesCache',
+      'function styleGetFontFamilies',
+      'figma.listAvailableFontsAsync().then',
+    ])
+    && mockRuntime.includes('style font search should call listAvailableFontsAsync once per plugin session'),
+  'Figma Context7 lookup performance mapping, cached lookup implementation, or one-call regression coverage is incomplete.',
+);
+
+add(
+  checks,
+  'feature-improvements',
+  'User-requested feature improvements are present as concrete plugin behavior: cached Style Guide font lookup, stale response protection, runtime evidence helpers, and verifier-backed requirement traceability.',
+  'README.md Feature improvements section, src/code/30-style-guide.js cached lookup, src/ui/app.js request sequencing, macOS/Linux evidence helpers, run-smoke-test-mock.mjs and run-ui-roundtrip-smoke.mjs regressions',
+  hasAll(readme, [
+    'Feature improvements',
+    'Style Guide font search cache',
+    'Figma Context7 lookup performance mapping',
+    'macOS/Linux runtime evidence helpers',
+  ])
+    && hasAll(codeStyleSource, [
+      'styleFontFamiliesCache',
+      'styleFontFamiliesInflight',
+      'function styleGetFontFamilies',
+      'requestId: requestId',
+    ])
+    && hasAll(uiAppSource, [
+      'let styleFontSearchSeq = 0',
+      'requestId: styleFontSearchSeq',
+      'msg.requestId !== styleFontSearchSeq',
+    ])
+    && hasAll(localRunner, [
+      'runMacShellSmokeChecks',
+      'capture-runtime-evidence.sh',
+      'watch-runtime-clipboard.sh',
+    ])
+    && hasAll(mockRuntime, [
+      'style font search should call listAvailableFontsAsync once per plugin session',
+      'style font search should echo requestId',
+    ])
+    && hasAll(uiRoundtrip, [
+      'Style font search should track request sequence',
+      'Style font search should ignore stale results',
+    ]),
+  'Feature improvement mapping, implementation, helper coverage, or regression tests are incomplete.',
+);
+
+add(
+  checks,
+  'ux-improvements',
+  'User-requested UX improvements are present as visible interaction behavior: cached-result feedback, Design QA label reset/status feedback, localized removal affordance, and agent-note sanitization.',
+  'README.md UX improvements section, src/ui/app.js Style Guide and Design QA helpers, src/ui/i18n.js EN/KO UX strings, run-ui-roundtrip-smoke.mjs UX assertions',
+  hasAll(readme, [
+    'UX improvements',
+    'Style Guide cached-result feedback',
+    'Design QA screenshot-reload label reset',
+    'localized remove-label controls',
+    'sanitized agent notes',
+  ])
+    && hasAll(uiAppSource, [
+      'function styleRenderFontSearching',
+      'function styleRenderFontResults',
+      "t('style.searchCached')",
+      'function qaSetImplImageResult',
+      'qaResetImplLabels();',
+      'function qaSanitizeAgentNoteText',
+      "del.setAttribute('aria-label', t('designqa.removeLabel'))",
+    ])
+    && hasAll(uiI18nSource, [
+      "'style.searchCached': 'Font list cached for this plugin session.'",
+      "'style.searchCached': '이 플러그인 세션에서 폰트 목록을 캐시했습니다.'",
+      "'designqa.removeLabel': 'Remove label'",
+      "'designqa.removeLabel': '라벨 삭제'",
+      "'designqa.implLoaded'",
+      "'designqa.implScaled'",
+    ])
+    && hasAll(uiRoundtrip, [
+      'i18n missing style.searchCached key',
+      'Design QA should reset labels when a new implementation screenshot is loaded',
+      'Design QA remove button title should be localized',
+      'qaSanitizeAgentNoteText should prevent fenced-block injection',
+      'English designqa.implLoaded did not render',
+      'Korean designqa.implScaled did not render',
+    ]),
+  'UX improvement documentation, interaction implementation, i18n strings, or regression coverage is incomplete.',
+);
+
+add(
+  checks,
+  'dynamic-i18n-guard',
+  'Dynamic user-facing strings do not branch directly on LANG for Korean/English selection; discovered CSV toggle labels are dictionary-backed and verifier-protected.',
+  'src/ui/app.js menu CSV toggle t(...) calls, src/ui/i18n.js menu.excelToggleCollapsed/Expanded EN/KO keys, verify-integration.mjs LANG branch ban',
+  !uiAppSource.includes("LANG === 'ko' ?")
+    && hasAll(uiAppSource, [
+      "t('menu.excelToggleCollapsed')",
+      "t('menu.excelToggleExpanded')",
+    ])
+    && hasAll(uiI18nSource, [
+      "'menu.excelToggleCollapsed': '▶ Load from Excel (CSV)'",
+      "'menu.excelToggleExpanded': '▼ Load from Excel (CSV)'",
+      "'menu.excelToggleCollapsed': '▶ 엑셀(CSV) 파일에서 불러오기'",
+      "'menu.excelToggleExpanded': '▼ 엑셀(CSV) 파일 접기'",
+    ])
+    && verifier.includes('UI source must not branch on LANG for user-facing strings; use I18N keys'),
+  'Dynamic language branch or dictionary-backed CSV toggle verification is incomplete.',
+);
+
+add(
+  checks,
+  'diagnostic-i18n-guard',
+  'Menu and Table diagnostic summary chips use dictionary-backed formatter keys instead of direct LANG branches or hardcoded Korean/English labels.',
+  'src/ui/app.js menuRenderDiagnostics/tableRenderDiagnostics t(...) calls, src/ui/i18n.js menu.diag*/table.diag* EN/KO formatter keys, run-ui-roundtrip-smoke.mjs diagnostic LANG-branch regression',
+  !uiAppSource.includes("const labels = LANG === 'ko'")
+    && hasAll(uiAppSource, [
+      "t('menu.diagTotal'",
+      "t('menu.diagSelected'",
+      "t('menu.diagClean')",
+      "t('table.diagShape'",
+      "t('table.diagSplit'",
+      "t('table.diagClean')",
+    ])
+    && hasAll(uiI18nSource, [
+      "'menu.diagTotal'",
+      "'menu.diagSelected'",
+      "'menu.diagDuplicateNames'",
+      "'menu.diagClean'",
+      "'table.diagShape'",
+      "'table.diagSplit'",
+      "'table.diagIdle'",
+      "'table.diagClean'",
+    ])
+    && hasAll(uiRoundtrip, [
+      'diagnostic summary labels should use i18n keys instead of LANG branches',
+      'i18n missing diagnostic key: ',
+      'menu.diagTotal',
+      'table.diagShape',
+    ]),
+  'Menu/Table diagnostic summary labels still have direct language branches, missing dictionary keys, or missing regression coverage.',
+);
+
+add(
+  checks,
+  'aria-i18n-guard',
+  'Static and dynamic accessibility labels for language and panel-size controls are dictionary-backed and expose accurate pressed state to assistive technology.',
+  'src/ui/index.html data-i18n-aria, src/ui/app.js aria-label/aria-pressed updates, src/ui/i18n.js ui.sizeGroup EN/KO keys, verify-integration.mjs and run-ui-roundtrip-smoke.mjs aria regressions',
+  !ui.includes('aria-label="Panel size"')
+    && hasAll(ui, [
+      'data-i18n-aria="ui.sizeGroup"',
+      "querySelectorAll('[data-i18n-aria]')",
+      "setAttribute('aria-label', t(el.dataset.i18nAria))",
+      "setAttribute('aria-pressed', String(uiSize === size))",
+      "setAttribute('aria-pressed', String(LANG === 'en'))",
+      "setAttribute('aria-pressed', String(LANG === 'ko'))",
+    ])
+    && hasAll(uiI18nSource, [
+      "'ui.sizeGroup': 'Panel size'",
+      "'ui.sizeGroup': '패널 크기'",
+    ])
+    && hasAll(verifier, [
+      'Panel size aria-label must be dictionary-backed for i18n',
+      'Panel size control must expose a localized aria-label key',
+      'static i18n key coverage must include data-i18n-aria attributes',
+      'UI size preset buttons must expose aria-pressed state',
+      'English language button must expose aria-pressed state',
+      'Korean language button must expose aria-pressed state',
+    ])
+    && hasAll(uiRoundtrip, [
+      'English data-i18n-aria content did not render',
+      'Korean data-i18n-aria content did not render',
+      'English language button should expose aria-pressed=true',
+      'Korean language button should expose aria-pressed=true after Korean switch',
+      'Default size button should expose aria-pressed=true',
+    ]),
+  'ARIA labels or pressed states are hardcoded, missing dictionary keys, or missing regression coverage.',
 );
 
 add(
@@ -670,6 +974,8 @@ add(
     'Test-FolderMaker.ps1',
     'validate-style-token-json.mjs',
     'capture-runtime-evidence.mjs',
+    'watch-runtime-http.mjs',
+    'runtime evidence HTTP receiver self-test',
     'forged runtime evidence rejection',
     'Node.js launcher guidance check passed',
     'runWindowsCmdSmokeChecks',
@@ -754,6 +1060,113 @@ add(
   'Node.js missing-runtime guidance is incomplete.',
 );
 
+add(
+  checks,
+  'macos-runtime-evidence-helpers',
+  'macOS/Linux shell wrappers and root launcher can capture copied Figma runtime smoke evidence, receive localhost HTTP smoke evidence, run the completion audit, watch the clipboard, open Accessibility settings, run guided runtime acceptance, and explain Node.js/Figma desktop readiness.',
+  'KLIC-START.sh, capture-runtime-evidence.sh, run-completion-audit.sh, watch-runtime-clipboard.sh, watch-runtime-http.sh, RUNTIME_CHECKLIST.md, run-local-verification.mjs launcher checks',
+  hasAll(runtimeEvidenceSh, [
+    '#!/usr/bin/env bash',
+    'command -v node',
+    'brew install node',
+    'https://nodejs.org/',
+    'capture-runtime-evidence.mjs',
+  ])
+    && hasAll(completionAuditSh, [
+      '#!/usr/bin/env bash',
+      'command -v node',
+      'brew install node',
+      'https://nodejs.org/',
+      'run-completion-audit.mjs',
+    ])
+    && hasAll(runtimeEvidenceClipboardWatcherSh, [
+      '#!/usr/bin/env bash',
+      'command -v node',
+      'brew install node',
+      'https://nodejs.org/',
+      'watch-runtime-clipboard.mjs',
+    ])
+    && hasAll(runtimeEvidenceHttpWatcherSh, [
+      '#!/usr/bin/env bash',
+      'command -v node',
+      'brew install node',
+      'https://nodejs.org/',
+      'watch-runtime-http.mjs',
+    ])
+    && hasAll(runtimeEvidenceClipboardWatcher, [
+      'powershell.exe',
+      'pbpaste',
+      'wl-paste',
+      'xclip',
+    ])
+    && hasAll(runtimeEvidenceHttpWatcher, [
+      '/klic-figma-smoke-evidence',
+      'open any design file',
+      '--require-figma-runtime',
+      '--self-test',
+      'run-completion-audit.mjs',
+    ])
+    && hasAll(macRootLauncherSh, [
+      '#!/usr/bin/env bash',
+      'run-local-verification.mjs',
+      'capture-runtime-evidence.sh',
+      'run-completion-audit.sh',
+      'watch-runtime-evidence.mjs',
+      'watch-runtime-clipboard.sh',
+      'watch-runtime-http.sh',
+      '--watch-http',
+      '--runtime-acceptance',
+      '--wait-accessibility-runtime',
+      'wait_for_accessibility_runtime',
+      'KLIC accessibility wait:',
+      'run_runtime_acceptance',
+      'open_figma_desktop',
+      'Figma desktop: open request sent',
+      'open_figma_design_file',
+      'FigmaAgent design file open:',
+      '/figma/desktop/open-url',
+      'https://www.figma.com/design/new',
+      'check_figma_agent_open_url',
+      'FigmaAgent URL-open check:',
+      'run_runtime_acceptance_watchers',
+      'KLIC runtime acceptance: watching localhost HTTP and clipboard evidence.',
+      'try_run_figma_plugin_menu',
+      'KLIC auto menu launch skipped',
+      'open any Figma design file first',
+      'Run Runtime Smoke Evidence',
+      'accessibility_any_granted_clients',
+      'Accessibility permission: no grants found in user TCC database',
+      'accessibility_controller_hint',
+      'Accessibility controller hint:',
+      'apple_events_any_clients',
+      'AppleEvents permission:',
+      'AppleEvents permission: Accessibility is still required for System Events menu automation.',
+      '--open-accessibility',
+      'open -Ra Figma',
+      'https://www.figma.com/downloads/',
+    ])
+    && hasAll(runtimeChecklist, [
+      './KLIC-START.sh --runtime-acceptance',
+      './KLIC-START.sh --wait-accessibility-runtime',
+      './klic-figma-toolkit/capture-runtime-evidence.sh',
+      './klic-figma-toolkit/watch-runtime-clipboard.sh',
+      './klic-figma-toolkit/watch-runtime-http.sh',
+    ])
+    && hasAll(localRunner, [
+      'KLIC-START.sh',
+      'capture-runtime-evidence.sh',
+      'run-completion-audit.sh',
+      'watch-runtime-clipboard.sh',
+      'watch-runtime-http.sh',
+      '--runtime-acceptance',
+      'runtime evidence HTTP receiver self-test',
+      'root launcher sh help',
+      'root launcher sh readiness check',
+      'brew install node',
+    ]),
+  'macOS/Linux runtime evidence wrappers, root launcher, or documentation are incomplete.',
+);
+
 let localResult = null;
 if (!args.skipLocal) {
   localResult = run('local preflight', 'node', ['klic-figma-toolkit/run-local-verification.mjs']);
@@ -792,7 +1205,7 @@ add(
   Boolean(runtimeEvidencePath && fs.existsSync(runtimeEvidencePath) && runtimeEvidenceResult?.status === 0),
   args.runtimeEvidence
     ? 'Runtime evidence file is missing or failed validation.'
-    : 'Run the plugin in Figma desktop, click Run smoke test, copy the evidence JSON, then run capture-runtime-evidence.cmd or pass it with --runtime-evidence.',
+    : 'Run ./KLIC-START.sh --runtime-acceptance. If Accessibility settings are already open, use ./KLIC-START.sh --wait-accessibility-runtime so the launcher continues as soon as permission is granted. The launcher starts HTTP/clipboard watchers and tries to open a new Figma design file through FigmaAgent. If FigmaAgent does not open a design file, open any Figma design file manually, then open the plugin in Figma desktop so it can POST smoke evidence. Or click Run smoke test, copy the evidence JSON, and run capture-runtime-evidence.cmd on Windows or ./klic-figma-toolkit/capture-runtime-evidence.sh on macOS/Linux. You can also pass the saved file with --runtime-evidence.',
 );
 
 add(
@@ -824,6 +1237,29 @@ add(
     '📦 Components',
   ]),
   'Runtime checklist is missing a required manual/validator gate.',
+);
+
+add(
+  checks,
+  'acceptance-status-handoff',
+  'Acceptance status handoff maps the original Korean objective to concrete audit evidence and clearly identifies the remaining real Figma runtime evidence blocker.',
+  'ACCEPTANCE_STATUS.md objective mapping, current verified state, final acceptance steps, actual-figma-runtime-smoke-evidence blocker',
+  hasAll(acceptanceStatus, [
+    '2026-07-04 09:00 KST',
+    'feature-improvements',
+    'ux-improvements',
+    'figma-context7-lookup-performance',
+    'font-search-performance',
+    'i18n-dictionary-parity',
+    'i18n-dictionary-type-parity',
+    'dynamic-i18n-guard',
+    'diagnostic-i18n-guard',
+    'aria-i18n-guard',
+    'actual-figma-runtime-smoke-evidence',
+    './KLIC-START.sh',
+    './klic-figma-toolkit/capture-runtime-evidence.sh',
+  ]),
+  'Acceptance status handoff is missing objective mapping, verified evidence, final acceptance commands, or the remaining runtime blocker.',
 );
 
 printChecklist(checks);

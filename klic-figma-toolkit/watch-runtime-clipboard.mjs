@@ -50,13 +50,31 @@ function run(command, args, options = {}) {
   });
 }
 
+function readClipboardWith(command, args) {
+  const result = run(command, args);
+  if (result.status === 0 && result.stdout) return result.stdout;
+  return '';
+}
+
 function readClipboard() {
-  const result = run('powershell.exe', [
+  const powershell = readClipboardWith('powershell.exe', [
     '-NoProfile',
     '-Command',
     '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-Clipboard -Raw',
   ]);
-  if (result.status === 0 && result.stdout) return result.stdout;
+  if (powershell.trim()) return powershell;
+
+  if (process.platform === 'darwin') {
+    const pbpaste = readClipboardWith('pbpaste', []);
+    if (pbpaste.trim()) return pbpaste;
+  }
+
+  const wlPaste = readClipboardWith('wl-paste', ['--no-newline']);
+  if (wlPaste.trim()) return wlPaste;
+
+  const xclip = readClipboardWith('xclip', ['-selection', 'clipboard', '-out']);
+  if (xclip.trim()) return xclip;
+
   return '';
 }
 

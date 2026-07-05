@@ -3,23 +3,45 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ─── Font search ────────────────────────────────────────────────────── */
-async function searchFonts(query) {
-  try {
-    var all = await figma.listAvailableFontsAsync();
-    var lower = (query || '').toLowerCase();
+var styleFontFamiliesCache = null;
+var styleFontFamiliesInflight = null;
+
+async function styleGetFontFamilies() {
+  if (styleFontFamiliesCache) return styleFontFamiliesCache;
+  if (styleFontFamiliesInflight) return styleFontFamiliesInflight;
+  styleFontFamiliesInflight = figma.listAvailableFontsAsync().then(function (all) {
     var seen = {};
-    var results = [];
+    var families = [];
     for (var i = 0; i < all.length; i++) {
       var fam = all[i].fontName.family;
-      if (!seen[fam] && (!lower || fam.toLowerCase().indexOf(lower) >= 0)) {
+      if (!seen[fam]) {
         seen[fam] = true;
-        results.push(fam);
+        families.push(fam);
       }
     }
-    results.sort();
-    figma.ui.postMessage({ type: 'style-font-result', families: results.slice(0, 40) });
+    families.sort();
+    styleFontFamiliesCache = families;
+    styleFontFamiliesInflight = null;
+    return families;
+  }).catch(function (err) {
+    styleFontFamiliesInflight = null;
+    throw err;
+  });
+  return styleFontFamiliesInflight;
+}
+
+async function searchFonts(query, requestId) {
+  try {
+    var cached = !!styleFontFamiliesCache;
+    var families = await styleGetFontFamilies();
+    var lower = (query || '').toLowerCase();
+    var results = [];
+    for (var i = 0; i < families.length; i++) {
+      if (!lower || families[i].toLowerCase().indexOf(lower) >= 0) results.push(families[i]);
+    }
+    figma.ui.postMessage({ type: 'style-font-result', families: results.slice(0, 40), requestId: requestId, cached: cached });
   } catch (e) {
-    figma.ui.postMessage({ type: 'style-font-result', families: [] });
+    figma.ui.postMessage({ type: 'style-font-result', families: [], requestId: requestId });
   }
 }
 

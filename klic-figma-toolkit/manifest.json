@@ -4,6 +4,10 @@
   "api": "1.0.0",
   "main": "code.js",
   "ui": "ui.html",
+  "menu": [
+    { "name": "Open Toolkit", "command": "open-toolkit" },
+    { "name": "Run Runtime Smoke Evidence", "command": "run-smoke-evidence" }
+  ],
   "editorType": ["figma"],
   "documentAccess": "dynamic-page",
   "networkAccess": {

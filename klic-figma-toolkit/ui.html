@@ -432,7 +432,7 @@
   <div class="topbar">
     <span class="brand">KLIC Figma Toolkit</span>
     <div class="topbar-actions">
-      <div class="size-toggle" aria-label="Panel size">
+      <div class="size-toggle" data-i18n-aria="ui.sizeGroup">
         <button class="size-btn" id="size-compact" onclick="resizeUi('compact')" data-i18n-title="ui.sizeCompact">S</button>
         <button class="size-btn active" id="size-default" onclick="resizeUi('default')" data-i18n-title="ui.sizeDefault">M</button>
         <button class="size-btn" id="size-wide" onclick="resizeUi('wide')" data-i18n-title="ui.sizeWide">L</button>
@@ -962,6 +962,7 @@ const I18N = {
     'ui.sizeCompact': 'Compact panel',
     'ui.sizeDefault': 'Default panel',
     'ui.sizeWide': 'Wide panel',
+    'ui.sizeGroup': 'Panel size',
 
     'command.title': 'Design Ops Command Center',
     'command.desc': 'Audit, token binding, generation, and handoff tools in one professional workspace.',
@@ -1076,6 +1077,8 @@ const I18N = {
     'menu.htmlPh': 'Browser view source (Ctrl+U) → copy all (Ctrl+A, Ctrl+C) → paste here (Ctrl+V)',
     'menu.parseHtml': 'Parse HTML',
     'menu.excelToggle': '▶ Load from Excel (CSV)',
+    'menu.excelToggleCollapsed': '▶ Load from Excel (CSV)',
+    'menu.excelToggleExpanded': '▼ Load from Excel (CSV)',
     'menu.csvHint': 'Excel → File → Save As → <strong style="color:#ccc">CSV UTF-8 (Comma delimited)(.csv)</strong>, then upload',
     'menu.selectCsv': 'Select CSV file',
     'menu.sampleCsv': 'Load sample CSV',
@@ -1103,6 +1106,14 @@ const I18N = {
     'menu.parseFail': 'Menu structure not found. Using default data.',
     'menu.htmlEmpty': 'Please paste HTML.',
     'menu.csvOk': (n) => `✅ ${n} menus loaded from CSV`,
+    'menu.diagTotal': (n) => `${n} total`,
+    'menu.diagSelected': (n) => `${n} selected`,
+    'menu.diagDuplicateNames': (n) => `${n} duplicate names`,
+    'menu.diagDuplicatePaths': (n) => `${n} duplicate paths`,
+    'menu.diagEmptyNames': (n) => `${n} empty names`,
+    'menu.diagDeepPaths': (n) => `${n} deep paths`,
+    'menu.diagLongNames': (n) => `${n} long names`,
+    'menu.diagClean': 'Diagnostics passed',
     'menu.csvFail': 'Cannot read CSV file.\nIf text is garbled, change encoding and retry.',
     'menu.csvNoCategory': 'No menus match the selected category.',
     'menu.noCategoryCol': 'No category column',
@@ -1134,6 +1145,7 @@ const I18N = {
     'style.genVars': 'Create Variables', 'style.drawBoard': 'Draw Board',
     'style.genComp': 'Components',
     'style.searching': 'Searching...',
+    'style.searchCached': 'Font list cached for this plugin session.',
     'style.noResult': 'No results',
     'style.sampleLoaded': 'style-guide-viewer_ver2.md loaded.',
     'style.exportNeedParse': 'Parse the MD before exporting JSON.',
@@ -1141,6 +1153,7 @@ const I18N = {
     'style.jsonImportFail': 'Cannot import style token JSON.',
     'style.mdEmpty': 'Please enter MD content.',
     'style.noColor': 'No color info found.\nPlease check the MD file format.',
+    'style.errPrefix': 'Error: ',
     'style.summary': (t, b, s, sp, r) => `${t} Variables will be created (brand ${b} × 13 steps, semantic ${s}, spacing ${sp}, radius ${r})`,
     'style.summaryFont': (f) => ` · font: ${f}`,
     'style.fontSel': (f) => '✓ ' + f,
@@ -1173,6 +1186,13 @@ const I18N = {
     'table.errPrefix': 'Error: ',
     'table.colorLabels': { border: 'Border', headerBg: 'Header BG', footerBg: 'Footer BG', altBg: 'Alt row', cellBg: 'Cell' },
     'table.directInput': 'Direct input',
+    'table.diagShape': (r, c) => `${r} rows × ${c} cols`,
+    'table.diagSplit': (h, b, f) => `header ${h} · body ${b} · footer ${f}`,
+    'table.diagInconsistentRows': (n) => `${n} inconsistent rows`,
+    'table.diagEmptyHeaderCells': (n) => `${n} empty headers`,
+    'table.diagLongCells': (n) => `${n} long cells`,
+    'table.diagIdle': 'Waiting for data',
+    'table.diagClean': 'Diagnostics passed',
     'designqa.title': 'Design QA Diff',
     'designqa.desc': 'Capture the design and the implemented page, label the differences, commit to canvas.',
     'designqa.rasterize': 'Capture selected frame',
@@ -1195,7 +1215,10 @@ const I18N = {
     'designqa.labels': 'Labels',
     'designqa.commit': 'Commit to canvas',
     'designqa.copyNote': 'Copy agent note',
+    'designqa.removeLabel': 'Remove label',
     'designqa.agentNotePh': 'Agent handoff note appears here.',
+    'designqa.implLoaded': (w, h) => `Implementation screenshot loaded at ${w} x ${h}. Existing labels cleared.`,
+    'designqa.implScaled': (fromW, fromH, toW, toH) => `Implementation screenshot resized from ${fromW} x ${fromH} to ${toW} x ${toH}. Existing labels cleared.`,
     'designqa.noDesign': 'Select a frame and capture it first.',
     'designqa.noImpl': 'Upload an implementation screenshot first.',
     'designqa.committed': 'Board created.',
@@ -1211,6 +1234,7 @@ const I18N = {
     'ui.sizeCompact': '작은 패널',
     'ui.sizeDefault': '기본 패널',
     'ui.sizeWide': '넓은 패널',
+    'ui.sizeGroup': '패널 크기',
 
     'command.title': 'Design Ops Command Center',
     'command.desc': '진단, 토큰 바인딩, 생성, 핸드오프 도구를 하나의 전문가 작업실로 통합합니다.',
@@ -1325,6 +1349,8 @@ const I18N = {
     'menu.htmlPh': '브라우저 소스 보기(Ctrl+U) → 전체 복사(Ctrl+A, Ctrl+C) → 여기에 붙여넣기(Ctrl+V)',
     'menu.parseHtml': 'HTML 분석하기',
     'menu.excelToggle': '▶ 엑셀(CSV) 파일에서 불러오기',
+    'menu.excelToggleCollapsed': '▶ 엑셀(CSV) 파일에서 불러오기',
+    'menu.excelToggleExpanded': '▼ 엑셀(CSV) 파일 접기',
     'menu.csvHint': '엑셀 → 파일 → 다른 이름으로 저장 → <strong style="color:#ccc">CSV UTF-8(쉼표로 분리)(.csv)</strong> 선택 후 업로드',
     'menu.selectCsv': 'CSV 파일 선택',
     'menu.sampleCsv': '샘플 CSV 불러오기',
@@ -1352,6 +1378,14 @@ const I18N = {
     'menu.parseFail': '메뉴 구조를 찾지 못했습니다. 기본 데이터를 사용합니다.',
     'menu.htmlEmpty': 'HTML을 붙여넣어 주세요.',
     'menu.csvOk': (n) => `✅ CSV에서 ${n}개 메뉴 로드 완료`,
+    'menu.diagTotal': (n) => `총 ${n}개`,
+    'menu.diagSelected': (n) => `선택 ${n}개`,
+    'menu.diagDuplicateNames': (n) => `중복 메뉴명 ${n}`,
+    'menu.diagDuplicatePaths': (n) => `중복 경로 ${n}`,
+    'menu.diagEmptyNames': (n) => `빈 메뉴명 ${n}`,
+    'menu.diagDeepPaths': (n) => `깊은 경로 ${n}`,
+    'menu.diagLongNames': (n) => `긴 메뉴명 ${n}`,
+    'menu.diagClean': '진단 통과',
     'menu.csvFail': 'CSV 파일을 읽을 수 없습니다.\n글자가 깨지면 인코딩을 변경해 다시 시도해 주세요.',
     'menu.csvNoCategory': '선택한 분류에 해당하는 메뉴가 없습니다.',
     'menu.noCategoryCol': '분류 열 없음',
@@ -1383,6 +1417,7 @@ const I18N = {
     'style.genVars': 'Figma Variables 생성', 'style.drawBoard': '보드 그리기',
     'style.genComp': '컴포넌트 생성',
     'style.searching': '검색 중...',
+    'style.searchCached': '이 플러그인 세션에서 폰트 목록을 캐시했습니다.',
     'style.noResult': '검색 결과 없음',
     'style.sampleLoaded': 'style-guide-viewer_ver2.md를 불러왔습니다.',
     'style.exportNeedParse': 'JSON을 내보내려면 먼저 MD를 분석하세요.',
@@ -1390,6 +1425,7 @@ const I18N = {
     'style.jsonImportFail': '스타일 토큰 JSON을 가져올 수 없습니다.',
     'style.mdEmpty': 'MD 내용을 입력해주세요.',
     'style.noColor': '컬러 정보를 찾지 못했습니다.\nMD 파일 형식을 확인해주세요.',
+    'style.errPrefix': '오류: ',
     'style.summary': (t, b, s, sp, r) => `총 ${t}개 Variables 생성 예정 (브랜드 ${b}색 × 13단계, 시맨틱 ${s}색, 여백 ${sp}개, 둥글기 ${r}개)`,
     'style.summaryFont': (f) => ` · 폰트: ${f}`,
     'style.fontSel': (f) => '✓ ' + f,
@@ -1422,6 +1458,13 @@ const I18N = {
     'table.errPrefix': '오류: ',
     'table.colorLabels': { border: '라인색', headerBg: '헤더 배경', footerBg: '푸터 배경', altBg: '교대 행', cellBg: '일반 셀' },
     'table.directInput': '직접 입력',
+    'table.diagShape': (r, c) => `${r}행 × ${c}열`,
+    'table.diagSplit': (h, b, f) => `헤더 ${h} · 바디 ${b} · 푸터 ${f}`,
+    'table.diagInconsistentRows': (n) => `열 수 불일치 ${n}`,
+    'table.diagEmptyHeaderCells': (n) => `빈 헤더 ${n}`,
+    'table.diagLongCells': (n) => `긴 셀 ${n}`,
+    'table.diagIdle': '데이터 대기',
+    'table.diagClean': '진단 통과',
     'designqa.title': '디자인 QA 비교',
     'designqa.desc': '디자인과 구현 페이지를 캡처해 차이를 라벨링하고 캔버스에 기록합니다.',
     'designqa.rasterize': '선택 프레임 캡처',
@@ -1444,7 +1487,10 @@ const I18N = {
     'designqa.labels': '라벨',
     'designqa.commit': '캔버스에 기록',
     'designqa.copyNote': '에이전트 노트 복사',
+    'designqa.removeLabel': '라벨 삭제',
     'designqa.agentNotePh': '에이전트 전달 노트가 여기에 표시됩니다.',
+    'designqa.implLoaded': (w, h) => `구현 스크린샷을 ${w} x ${h} 크기로 불러왔습니다. 기존 라벨은 초기화했습니다.`,
+    'designqa.implScaled': (fromW, fromH, toW, toH) => `구현 스크린샷을 ${fromW} x ${fromH}에서 ${toW} x ${toH}로 축소했습니다. 기존 라벨은 초기화했습니다.`,
     'designqa.noDesign': '프레임을 선택하고 먼저 캡처하세요.',
     'designqa.noImpl': '구현 스크린샷을 먼저 업로드하세요.',
     'designqa.committed': '보드가 생성되었습니다.',
@@ -1493,9 +1539,14 @@ function applyLang() {
   document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
   document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
   document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
+  document.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
   document.documentElement.lang = LANG;
-  document.getElementById('lang-en').classList.toggle('active', LANG === 'en');
-  document.getElementById('lang-ko').classList.toggle('active', LANG === 'ko');
+  const langEn = document.getElementById('lang-en');
+  const langKo = document.getElementById('lang-ko');
+  langEn.classList.toggle('active', LANG === 'en');
+  langKo.classList.toggle('active', LANG === 'ko');
+  langEn.setAttribute('aria-pressed', String(LANG === 'en'));
+  langKo.setAttribute('aria-pressed', String(LANG === 'ko'));
   applyUiSizeState();
   // re-render dynamic bits that depend on language
   commandRenderDynamicI18n();
@@ -1512,7 +1563,10 @@ function setLang(l) {
 function applyUiSizeState() {
   Object.keys(UI_SIZE_PRESETS).forEach(size => {
     const btn = document.getElementById('size-' + size);
-    if (btn) btn.classList.toggle('active', uiSize === size);
+    if (btn) {
+      btn.classList.toggle('active', uiSize === size);
+      btn.setAttribute('aria-pressed', String(uiSize === size));
+    }
   });
 }
 
@@ -2157,27 +2211,16 @@ function menuRenderDiagnostics(data) {
   if (!el) return;
   const summary = menuAnalyzeData(data);
   const selected = document.querySelectorAll('.menu-item-check:checked').length;
-  const labels = LANG === 'ko'
-    ? {
-      total: `총 ${summary.total}개`,
-      selected: `선택 ${selected}개`,
-      duplicateNames: `중복 메뉴명 ${summary.duplicateNames}`,
-      duplicatePaths: `중복 경로 ${summary.duplicatePaths}`,
-      emptyNames: `빈 메뉴명 ${summary.emptyNames}`,
-      deepPaths: `깊은 경로 ${summary.deepPaths}`,
-      longNames: `긴 메뉴명 ${summary.longNames}`,
-      clean: '진단 통과',
-    }
-    : {
-      total: `${summary.total} total`,
-      selected: `${selected} selected`,
-      duplicateNames: `${summary.duplicateNames} duplicate names`,
-      duplicatePaths: `${summary.duplicatePaths} duplicate paths`,
-      emptyNames: `${summary.emptyNames} empty names`,
-      deepPaths: `${summary.deepPaths} deep paths`,
-      longNames: `${summary.longNames} long names`,
-      clean: 'Diagnostics passed',
-    };
+  const labels = {
+    total: t('menu.diagTotal', summary.total),
+    selected: t('menu.diagSelected', selected),
+    duplicateNames: t('menu.diagDuplicateNames', summary.duplicateNames),
+    duplicatePaths: t('menu.diagDuplicatePaths', summary.duplicatePaths),
+    emptyNames: t('menu.diagEmptyNames', summary.emptyNames),
+    deepPaths: t('menu.diagDeepPaths', summary.deepPaths),
+    longNames: t('menu.diagLongNames', summary.longNames),
+    clean: t('menu.diagClean'),
+  };
   const warnings = [
     ['duplicateNames', summary.duplicateNames],
     ['duplicatePaths', summary.duplicatePaths],
@@ -2482,7 +2525,7 @@ function menuToggleExcel() {
   const isOpen = sec.style.display !== 'none';
   sec.style.display = isOpen ? 'none' : 'block';
   document.getElementById('menu-excel-toggle').textContent =
-    (isOpen ? '▶ ' : '▼ ') + (LANG === 'ko' ? '엑셀(CSV) 파일에서 불러오기' : 'Load from Excel (CSV)');
+    isOpen ? t('menu.excelToggleCollapsed') : t('menu.excelToggleExpanded');
 }
 
 /* ── Menu events ── */
@@ -2551,7 +2594,7 @@ document.getElementById('menu-apply-csv').addEventListener('click', () => {
   menuApplyData(data);
   menuSetStatus(t('menu.csvOk', data.length), 'ok');
   document.getElementById('menu-excel-section').style.display = 'none';
-  document.getElementById('menu-excel-toggle').textContent = '▶ ' + (LANG === 'ko' ? '엑셀(CSV) 파일에서 불러오기' : 'Load from Excel (CSV)');
+  document.getElementById('menu-excel-toggle').textContent = t('menu.excelToggleCollapsed');
 });
 document.getElementById('menu-filter-add').addEventListener('click', menuAddKeyword);
 document.getElementById('menu-filter').addEventListener('keydown', (e) => { if (e.key === 'Enter') menuAddKeyword(); });
@@ -2787,6 +2830,7 @@ function renderStylePreview(parsed, processed) {
 let styleProcessed = null;
 let styleSelectedFont = null;
 let styleLastFile = null;
+let styleFontSearchSeq = 0;
 
 function styleHashText(text) {
   let hash = 0;
@@ -2834,6 +2878,27 @@ function styleApplyFont(fam) {
   document.getElementById('style-font-label').textContent = t('style.fontSel', fam);
   if (styleProcessed) styleProcessed.fontFamily = fam;
   document.querySelectorAll('.font-result-item').forEach(el => el.classList.toggle('active', el.dataset.fam === fam));
+}
+
+function styleRenderFontSearching() {
+  const container = document.getElementById('style-font-results');
+  container.title = '';
+  container.innerHTML = `<div class="font-result-item" style="color:#555;cursor:default">${t('style.searching')}</div>`;
+}
+
+function styleRenderFontResults(families, cached) {
+  const container = document.getElementById('style-font-results');
+  container.title = cached ? t('style.searchCached') : '';
+  if (!families.length) {
+    container.innerHTML = `<div class="font-result-item" style="color:#555;cursor:default">${t('style.noResult')}</div>`;
+    return;
+  }
+  container.innerHTML = families.map(fam =>
+    `<div class="font-result-item${styleSelectedFont === fam ? ' active' : ''}" data-fam="${fam}">${fam}</div>`
+  ).join('');
+  container.querySelectorAll('.font-result-item[data-fam]').forEach(el => {
+    el.addEventListener('click', () => styleApplyFont(el.dataset.fam));
+  });
 }
 
 function styleParseCurrentMd(showLoadedMessage = false) {
@@ -2916,8 +2981,9 @@ function styleDownloadText(filename, text, type) {
 
 document.getElementById('style-font-search').addEventListener('click', () => {
   const q = document.getElementById('style-font-input').value.trim();
-  document.getElementById('style-font-results').innerHTML = `<div class="font-result-item" style="color:#555;cursor:default">${t('style.searching')}</div>`;
-  parent.postMessage({ pluginMessage: { type: 'style-search-fonts', query: q } }, '*');
+  styleFontSearchSeq++;
+  styleRenderFontSearching();
+  parent.postMessage({ pluginMessage: { type: 'style-search-fonts', query: q, requestId: styleFontSearchSeq } }, '*');
 });
 document.getElementById('style-font-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('style-font-search').click(); });
 
@@ -3187,25 +3253,15 @@ function tableRenderDiagnostics(parts) {
   const el = document.getElementById('table-diagnostics');
   if (!el) return;
   const summary = tableAnalyzeRows(parts);
-  const labels = LANG === 'ko'
-    ? {
-      shape: `${summary.rows}행 × ${summary.columns}열`,
-      split: `헤더 ${summary.headerRows} · 바디 ${summary.bodyRows} · 푸터 ${summary.footerRows}`,
-      inconsistentRows: `열 수 불일치 ${summary.inconsistentRows}`,
-      emptyHeaderCells: `빈 헤더 ${summary.emptyHeaderCells}`,
-      longCells: `긴 셀 ${summary.longCells}`,
-      idle: '데이터 대기',
-      clean: '진단 통과',
-    }
-    : {
-      shape: `${summary.rows} rows × ${summary.columns} cols`,
-      split: `header ${summary.headerRows} · body ${summary.bodyRows} · footer ${summary.footerRows}`,
-      inconsistentRows: `${summary.inconsistentRows} inconsistent rows`,
-      emptyHeaderCells: `${summary.emptyHeaderCells} empty headers`,
-      longCells: `${summary.longCells} long cells`,
-      idle: 'Waiting for data',
-      clean: 'Diagnostics passed',
-    };
+  const labels = {
+    shape: t('table.diagShape', summary.rows, summary.columns),
+    split: t('table.diagSplit', summary.headerRows, summary.bodyRows, summary.footerRows),
+    inconsistentRows: t('table.diagInconsistentRows', summary.inconsistentRows),
+    emptyHeaderCells: t('table.diagEmptyHeaderCells', summary.emptyHeaderCells),
+    longCells: t('table.diagLongCells', summary.longCells),
+    idle: t('table.diagIdle'),
+    clean: t('table.diagClean'),
+  };
   if (!summary.rows) {
     el.innerHTML = `<span class="diagnostic-chip">${labels.idle}</span>`;
     return;
@@ -3508,14 +3564,8 @@ window.onmessage = (event) => {
 
   /* ── Style ── */
   if (msg.type === 'style-font-result') {
-    const container = document.getElementById('style-font-results');
-    if (!msg.families.length) { container.innerHTML = `<div class="font-result-item" style="color:#555;cursor:default">${t('style.noResult')}</div>`; return; }
-    container.innerHTML = msg.families.map(fam =>
-      `<div class="font-result-item${styleSelectedFont === fam ? ' active' : ''}" data-fam="${fam}">${fam}</div>`
-    ).join('');
-    container.querySelectorAll('.font-result-item[data-fam]').forEach(el => {
-      el.addEventListener('click', () => styleApplyFont(el.dataset.fam));
-    });
+    if (msg.requestId && msg.requestId !== styleFontSearchSeq) return;
+    styleRenderFontResults(msg.families || [], msg.cached);
     return;
   }
   if (msg.type === 'style-progress') {
@@ -3543,7 +3593,7 @@ window.onmessage = (event) => {
     ['style-generate', 'style-draw', 'style-comp'].forEach(id => document.getElementById(id).disabled = false);
     document.getElementById('style-progress-wrap').style.display = 'none';
     const el = document.getElementById('style-result');
-    el.textContent = '❌ ' + msg.message;
+    el.textContent = t('style.errPrefix') + msg.message;
     el.className = 'result error'; el.style.display = 'block';
     return;
   }
@@ -3620,7 +3670,23 @@ function qaCanvasToPngBytes(canvas) {
 function qaSetImplImage(bytes, width, height) {
   qaImpl = { bytes, width, height };
   document.getElementById('qa-impl-img').src = qaBytesToObjectUrl(bytes);
+  qaResetImplLabels();
   qaUpdateAgentNote();
+}
+
+function qaSetImplImageResult(message) {
+  const result = document.getElementById('qa-result');
+  if (result) result.textContent = message;
+}
+
+function qaResetImplLabels() {
+  qaLabels = [];
+  qaRenderLabels();
+  qaRedrawOverlay();
+}
+
+function qaSanitizeAgentNoteText(value) {
+  return String(value == null ? '' : value).replace(/```/g, "'''");
 }
 
 function qaClamp01(value) {
@@ -3690,18 +3756,18 @@ function qaEncodeAgentNote(design, impl, labels) {
   }
   items.forEach((label, i) => {
     const kind = label && label.kind === 'point' ? 'point' : label && label.kind === 'arrow' ? 'arrow' : 'rect';
-    const category = label && label.category ? String(label.category) : 'other';
+    const category = qaSanitizeAgentNoteText(label && label.category ? label.category : 'other').replace(/"/g, "'");
     if (kind === 'point') {
       const p = qaPixelPoint(label, implW || 1, implH || 1);
-      lines.push('[' + (i + 1) + '] point (' + p.x + ',' + p.y + ') "' + category.replace(/"/g, "'") + '"');
+      lines.push('[' + (i + 1) + '] point (' + p.x + ',' + p.y + ') "' + category + '"');
     } else if (kind === 'arrow') {
       const a = qaPixelArrow(label, implW || 1, implH || 1);
-      lines.push('[' + (i + 1) + '] arrow (' + a.x1 + ',' + a.y1 + ')->(' + a.x2 + ',' + a.y2 + ') "' + category.replace(/"/g, "'") + '"');
+      lines.push('[' + (i + 1) + '] arrow (' + a.x1 + ',' + a.y1 + ')->(' + a.x2 + ',' + a.y2 + ') "' + category + '"');
     } else {
       const r = qaPixelRect(label, implW || 1, implH || 1);
-      lines.push('[' + (i + 1) + '] rect (' + r.x1 + ',' + r.y1 + ')-(' + r.x2 + ',' + r.y2 + ') "' + category.replace(/"/g, "'") + '"');
+      lines.push('[' + (i + 1) + '] rect (' + r.x1 + ',' + r.y1 + ')-(' + r.x2 + ',' + r.y2 + ') "' + category + '"');
     }
-    const note = String((label && label.note) || '').replace(/\s+$/, '');
+    const note = qaSanitizeAgentNoteText((label && label.note) || '').replace(/\s+$/, '');
     if (note) {
       note.split(/\r?\n/).forEach((line) => {
         lines.push('    ' + line);
@@ -3766,7 +3832,8 @@ function qaRenderLabels() {
     cat.addEventListener('change', () => { label.category = cat.value; qaUpdateAgentNote(); });
     const del = document.createElement('button');
     del.className = 'link-btn'; del.textContent = '×';
-    del.title = 'Remove';
+    del.title = t('designqa.removeLabel');
+    del.setAttribute('aria-label', t('designqa.removeLabel'));
     del.addEventListener('click', () => { qaLabels.splice(i, 1); qaRedrawOverlay(); qaRenderLabels(); });
     row.appendChild(num); row.appendChild(note); row.appendChild(cat); row.appendChild(del);
     list.appendChild(row);
@@ -3899,6 +3966,7 @@ function qaLoadImplFile(file) {
       const plan = qaPlanImageScale(probe.naturalWidth, probe.naturalHeight);
       if (plan.factor === 1) {
         qaSetImplImage(bytes, plan.width, plan.height);
+        qaSetImplImageResult(t('designqa.implLoaded', plan.width, plan.height));
         return;
       }
       const canvas = document.createElement('canvas');
@@ -3907,6 +3975,7 @@ function qaLoadImplFile(file) {
       canvas.getContext('2d').drawImage(probe, 0, 0, plan.width, plan.height);
       qaCanvasToPngBytes(canvas).then((scaledBytes) => {
         qaSetImplImage(scaledBytes, plan.width, plan.height);
+        qaSetImplImageResult(t('designqa.implScaled', probe.naturalWidth, probe.naturalHeight, plan.width, plan.height));
       }).catch(() => {
         document.getElementById('qa-result').textContent = t('designqa.errEncodeFailed');
       });

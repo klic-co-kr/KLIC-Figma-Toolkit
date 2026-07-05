@@ -4,7 +4,19 @@
    Message types are namespaced (menu-*, style-*, table-*) to avoid collisions.
    ═══════════════════════════════════════════════════════════════════════════ */
 
+var KLIC_RUNTIME_SMOKE_COMMAND = 'run-smoke-evidence';
+
 figma.showUI(__html__, { width: 720, height: 820, title: 'KLIC Figma Toolkit' });
+
+if (figma.command === KLIC_RUNTIME_SMOKE_COMMAND) {
+  setTimeout(function () {
+    runCommandSmokeTest({ postToLocalhost: true });
+  }, 0);
+} else {
+  setTimeout(function () {
+    commandMaybeRunLocalSmokeEvidence();
+  }, 0);
+}
 
 figma.ui.onmessage = async function (msg) {
   if (!msg || !msg.type) return;
@@ -39,7 +51,7 @@ figma.ui.onmessage = async function (msg) {
     case 'style-create-variables':  return createVariables(msg.data, msg.meta);
     case 'style-draw':              return drawStyleGuide(msg.data, msg.meta);
     case 'style-create-components': return createComponents(msg.data, msg.meta);
-    case 'style-search-fonts':      return searchFonts(msg.query);
+    case 'style-search-fonts':      return searchFonts(msg.query, msg.requestId);
 
     /* ── Design QA ── */
     case 'qa-rasterize-request':    return qaRasterizeSelection(msg);

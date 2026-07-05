@@ -11,6 +11,7 @@ function assert(condition, message) {
 }
 
 let idCounter = 1;
+let listAvailableFontsCallCount = 0;
 function nextId(prefix) {
   return `${prefix}:${idCounter++}`;
 }
@@ -279,11 +280,13 @@ const figma = {
     return Promise.resolve();
   },
   listAvailableFontsAsync() {
+    listAvailableFontsCallCount++;
     return Promise.resolve([
       { fontName: { family: 'Inter', style: 'Regular' } },
       { fontName: { family: 'Inter', style: 'Medium' } },
       { fontName: { family: 'Inter', style: 'SemiBold' } },
       { fontName: { family: 'Inter', style: 'Bold' } },
+      { fontName: { family: 'Pretendard', style: 'Regular' } },
     ]);
   },
   getLocalPagesAsync() {
@@ -1090,5 +1093,17 @@ await figma.ui.onmessage({
 });
 var qaInvalid = latestMessage('qa-commit-result');
 assert(qaInvalid && qaInvalid.error === 'invalid-dimensions', 'qa-commit should reject zero/negative impl dimensions');
+
+// ── Style Guide: font search cache ──
+listAvailableFontsCallCount = 0;
+await figma.ui.onmessage({ type: 'style-search-fonts', query: 'inter', requestId: 1 });
+var fontSearchFirst = latestMessage('style-font-result');
+assert(fontSearchFirst.requestId === 1, 'style font search should echo requestId');
+assert(fontSearchFirst.families.includes('Inter'), 'style font search should return matching family');
+await figma.ui.onmessage({ type: 'style-search-fonts', query: 'pre', requestId: 2 });
+var fontSearchSecond = latestMessage('style-font-result');
+assert(fontSearchSecond.requestId === 2, 'style font search should echo second requestId');
+assert(fontSearchSecond.families.includes('Pretendard'), 'style font search should filter cached families');
+assert(listAvailableFontsCallCount === 1, 'style font search should call listAvailableFontsAsync once per plugin session');
 
 console.log('Mock Figma runtime smoke test passed.');

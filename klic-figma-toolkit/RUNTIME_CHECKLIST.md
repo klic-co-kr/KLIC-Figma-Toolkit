@@ -10,6 +10,35 @@ On Windows, run the root launcher:
 
 It can run local preflight, capture copied Figma smoke evidence from the clipboard, run completion audit, watch an evidence file path, open this checklist, and install Node.js LTS with `winget`.
 
+On macOS/Linux, run the root launcher:
+
+`./KLIC-START.sh`
+
+It can run local preflight, receive Figma smoke evidence over localhost HTTP, capture copied Figma smoke evidence from the clipboard, run completion audit, watch an evidence file path, watch the clipboard, open this checklist, open macOS Accessibility settings, run guided runtime acceptance with HTTP and clipboard watchers, open Figma Desktop, try to open a new design file through FigmaAgent, try the Figma plugin menu automatically when Accessibility is granted, and check Node.js/Figma desktop readiness. On macOS, use `./KLIC-START.sh --check` to confirm whether Figma desktop is installed, whether a signed-in local profile is detected, whether Accessibility permission is visible for common terminal apps, and whether AppleEvents permission exists without the required Accessibility grant before runtime acceptance.
+
+For a non-interactive flow after Figma login, use:
+
+```bash
+./KLIC-START.sh --preflight
+./KLIC-START.sh --open-accessibility
+./KLIC-START.sh --runtime-acceptance
+./KLIC-START.sh --wait-accessibility-runtime
+./KLIC-START.sh --watch-http
+./KLIC-START.sh --capture-clipboard
+./KLIC-START.sh --audit path/to/figma-smoke-evidence.json
+./KLIC-START.sh --watch-clipboard
+```
+
+Figma desktop login is required before runtime evidence can be captured. If automated runtime navigation is blocked on macOS, run `./KLIC-START.sh --check` to distinguish AppleEvents from Accessibility, then run `./KLIC-START.sh --open-accessibility`, allow the controlling terminal app in `System Settings > Privacy & Security > Accessibility`, and restart the terminal session. If the Accessibility panel is already open, `./KLIC-START.sh --wait-accessibility-runtime` can wait for the grant and immediately continue into runtime acceptance. AppleEvents permission alone is not enough for `System Events` menu automation; if this is running from Ghostty, grant Accessibility to Ghostty and restart the terminal session.
+
+Preferred runtime evidence capture on macOS/Linux:
+
+```bash
+./KLIC-START.sh --runtime-acceptance
+```
+
+The launcher opens Figma Desktop after the receiver starts and tries to open a new design file through FigmaAgent. If Accessibility is granted, it also tries `Plugins > Development > Run Runtime Smoke Evidence` automatically. Otherwise, or if FigmaAgent cannot open the design file, open any Figma design file, then open `Plugins > Development > KLIC Figma Toolkit` in Figma desktop manually. The plugin probes `http://127.0.0.1:51337/klic-figma-smoke-evidence`, auto-runs the smoke test while the receiver is ready, and POSTs validated runtime evidence to the completion audit helper. The same guided command also watches the clipboard, so copied evidence JSON is accepted if HTTP POST is unavailable.
+
 If you want the Command Center `Open Folder Maker` button to launch the CSV folder generator, start the local bridge first:
 
 `folder-maker\folder-maker-bridge.cmd`
@@ -132,6 +161,15 @@ Preflight verifies the manifest contract:
     - Confirm Figma creates or reuses the `📦 Components` page.
     - Confirm the page includes Button, Input, Select, Badge, and Table component artifacts.
     - If an error appears, copy the full message because it includes the failed generation stage.
+16. **Style Guide font search performance / Figma Context7 lookup performance**:
+    - In `Style Guide`, search for `Inter` or another installed font and confirm matching font families render.
+    - Search again with a different query such as `Pretendard` or `Noto`.
+    - Confirm the panel remains responsive and the latest query result stays visible if searches are submitted quickly.
+    - Local regression coverage for this step is `font-search-performance` and `figma-context7-lookup-performance` in `run-completion-audit.mjs`; it proves repeated searches reuse the cached Figma `listAvailableFontsAsync()` font list and stale responses are ignored.
+17. **Dynamic i18n guard**:
+    - Switch the plugin language to `한국어`, open and close `Load from Excel (CSV)` in Menu Page, and confirm the CSV toggle label is Korean in both states.
+    - Switch back to `EN` and confirm the same toggle label is English in both states.
+    - Local regression coverage for this step is `dynamic-i18n-guard` in `run-completion-audit.mjs`; it proves the discovered `LANG === 'ko' ? ...` string branch is replaced with dictionary-backed i18n keys.
 
 ## Pass Criteria
 
@@ -151,6 +189,21 @@ If the evidence JSON is already on the clipboard after clicking `Copy evidence J
 
 `klic-figma-toolkit\capture-runtime-evidence.cmd`
 
+macOS/Linux users can run:
+
+`./klic-figma-toolkit/capture-runtime-evidence.sh`
+
+Or use the launcher menu/non-interactive launcher:
+
+```bash
+./KLIC-START.sh
+./KLIC-START.sh --open-accessibility
+./KLIC-START.sh --runtime-acceptance
+./KLIC-START.sh --watch-http
+./KLIC-START.sh --capture-clipboard
+./KLIC-START.sh --audit path/to/figma-smoke-evidence.json
+```
+
 Or run the Node script directly:
 
 `node klic-figma-toolkit/capture-runtime-evidence.mjs`
@@ -159,9 +212,21 @@ If you want to start the helper before copying from Figma, use the clipboard wat
 
 `klic-figma-toolkit\watch-runtime-clipboard.cmd`
 
+macOS/Linux users can run:
+
+`./klic-figma-toolkit/watch-runtime-clipboard.sh`
+
 Or run the Node script directly:
 
 `node klic-figma-toolkit/watch-runtime-clipboard.mjs`
+
+If you want the plugin to POST smoke evidence directly to localhost, start the HTTP receiver before opening the plugin:
+
+`./klic-figma-toolkit/watch-runtime-http.sh`
+
+Or run the Node script directly:
+
+`node klic-figma-toolkit/watch-runtime-http.mjs`
 
 If you used `Download JSON`, pass the downloaded file directly to the completion audit command above.
 

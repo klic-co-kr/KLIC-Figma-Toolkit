@@ -39,11 +39,20 @@ class FakeElement {
     this.innerHTML = '';
     this.placeholder = '';
     this.title = '';
+    this.attributes = {};
     this.disabled = false;
     this.checked = false;
   }
 
   addEventListener() {}
+
+  setAttribute(name, value) {
+    this.attributes[name] = String(value);
+  }
+
+  getAttribute(name) {
+    return this.attributes[name];
+  }
 
   querySelectorAll() {
     return [];
@@ -57,6 +66,7 @@ function makeDocument() {
     ['[data-i18n-ph]', []],
     ['[data-i18n-html]', []],
     ['[data-i18n-title]', []],
+    ['[data-i18n-aria]', []],
     ['.font-result-item', []],
   ]);
 
@@ -114,6 +124,7 @@ function createI18nHarness(script) {
   const mdPlaceholder = document.addDataElement('[data-i18n-ph]', 'i18nPh', 'style.mdPh');
   const csvHint = document.addDataElement('[data-i18n-html]', 'i18nHtml', 'menu.csvHint');
   const reloadTitle = document.addDataElement('[data-i18n-title]', 'i18nTitle', 'style.reloadTitle');
+  const sizeGroup = document.addDataElement('[data-i18n-aria]', 'i18nAria', 'ui.sizeGroup');
   document.getElementById('lang-en');
   document.getElementById('lang-ko');
 
@@ -141,7 +152,7 @@ return { I18N, t, applyLang, setLang, getLang: () => LANG };`,
     ...harness,
     document,
     localStorage,
-    elements: { exportJsonLabel, importJsonLabel, mdPlaceholder, csvHint, reloadTitle },
+    elements: { exportJsonLabel, importJsonLabel, mdPlaceholder, csvHint, reloadTitle, sizeGroup },
   };
 }
 
@@ -273,6 +284,15 @@ assert(ui.includes('id="fix-c-list"'), 'ui.html is missing per-item C fix list')
 assert(ui.includes("'command.fixBatchApply'") || ui.includes('command.fixBatchApply'), 'i18n missing fix batch label');
 assert(ui.includes("data-i18n=\"command.pipelineTitle\""), 'Project Pipeline title should be localized');
 assert(script.includes("commandApplyProjectPreset('public-education')"), 'public/education preset should be applied during UI initialization');
+assert(script.includes('styleFontSearchSeq'), 'Style font search should track request sequence');
+assert(script.includes('styleRenderFontResults'), 'Style font search should render results through a helper');
+assert(script.includes('requestId: styleFontSearchSeq'), 'Style font search should send requestId');
+assert(script.includes('msg.requestId !== styleFontSearchSeq'), 'Style font search should ignore stale results');
+assert(script.includes("'style.searchCached'"), 'i18n missing style.searchCached key');
+assert(!script.includes("const labels = LANG === 'ko'"), 'diagnostic summary labels should use i18n keys instead of LANG branches');
+for (const key of ['menu.diagTotal', 'menu.diagClean', 'table.diagShape', 'table.diagClean']) {
+  assert(script.includes(`'${key}'`), `i18n missing diagnostic key: ${key}`);
+}
 
 const i18n = createI18nHarness(script);
 i18n.applyLang();
@@ -282,6 +302,14 @@ assert(i18n.elements.importJsonLabel.textContent === 'Import JSON', 'English sty
 assert(i18n.elements.mdPlaceholder.placeholder.includes('Select an MD file'), 'English style.mdPh placeholder did not render');
 assert(i18n.elements.csvHint.innerHTML.includes('CSV UTF-8'), 'English data-i18n-html content did not render');
 assert(i18n.elements.reloadTitle.title === 'Reload last selected file', 'English data-i18n-title content did not render');
+assert(i18n.elements.sizeGroup.attributes['aria-label'] === 'Panel size', 'English data-i18n-aria content did not render');
+assert(i18n.document.getElementById('lang-en').attributes['aria-pressed'] === 'true', 'English language button should expose aria-pressed=true');
+assert(i18n.document.getElementById('lang-ko').attributes['aria-pressed'] === 'false', 'Korean language button should expose aria-pressed=false while English is active');
+assert(i18n.document.getElementById('size-default').attributes['aria-pressed'] === 'true', 'Default size button should expose aria-pressed=true');
+assert(i18n.document.getElementById('size-compact').attributes['aria-pressed'] === 'false', 'Compact size button should expose aria-pressed=false by default');
+assert(i18n.t('designqa.removeLabel') === 'Remove label', 'English designqa.removeLabel did not render');
+assert(i18n.t('designqa.implLoaded', 320, 200) === 'Implementation screenshot loaded at 320 x 200. Existing labels cleared.', 'English designqa.implLoaded did not render');
+assert(i18n.t('designqa.implScaled', 5000, 3000, 1568, 941) === 'Implementation screenshot resized from 5000 x 3000 to 1568 x 941. Existing labels cleared.', 'English designqa.implScaled did not render');
 
 i18n.setLang('ko');
 assert(i18n.localStorage.getItem('klic.lang') === 'ko', 'language selection was not persisted');
@@ -289,6 +317,12 @@ assert(i18n.document.documentElement.lang === 'ko', 'document lang did not switc
 assert(i18n.elements.exportJsonLabel.textContent === 'JSON 내보내기', 'Korean style.exportJson label did not render');
 assert(i18n.elements.importJsonLabel.textContent === 'JSON 가져오기', 'Korean style.importJson label did not render');
 assert(i18n.elements.mdPlaceholder.placeholder.includes('MD 파일'), 'Korean style.mdPh placeholder did not render');
+assert(i18n.elements.sizeGroup.attributes['aria-label'] === '패널 크기', 'Korean data-i18n-aria content did not render');
+assert(i18n.document.getElementById('lang-en').attributes['aria-pressed'] === 'false', 'English language button should expose aria-pressed=false after Korean switch');
+assert(i18n.document.getElementById('lang-ko').attributes['aria-pressed'] === 'true', 'Korean language button should expose aria-pressed=true after Korean switch');
+assert(i18n.t('designqa.removeLabel') === '라벨 삭제', 'Korean designqa.removeLabel did not render');
+assert(i18n.t('designqa.implLoaded', 320, 200) === '구현 스크린샷을 320 x 200 크기로 불러왔습니다. 기존 라벨은 초기화했습니다.', 'Korean designqa.implLoaded did not render');
+assert(i18n.t('designqa.implScaled', 5000, 3000, 1568, 941) === '구현 스크린샷을 5000 x 3000에서 1568 x 941로 축소했습니다. 기존 라벨은 초기화했습니다.', 'Korean designqa.implScaled did not render');
 
 const styleDocument = makeDocument();
 const styleHarness = createStyleHarness(script, styleDocument, i18n.t, embeddedMd);
@@ -443,6 +477,9 @@ assert(script.includes("'designqa.cat.color'"), 'i18n missing designqa category 
 assert(script.includes("qaNormalizeRect"), 'Design QA should expose a pure qaNormalizeRect helper');
 assert(script.includes("qaEncodeAgentNote"), 'Design QA should expose a pure qaEncodeAgentNote helper');
 assert(script.includes("qaPlanImageScale"), 'Design QA should expose a pure qaPlanImageScale helper');
+assert(script.includes("qaSanitizeAgentNoteText"), 'Design QA should expose a pure qaSanitizeAgentNoteText helper');
+assert(script.includes("qaResetImplLabels"), 'Design QA should reset labels when a new implementation screenshot is loaded');
+assert(!script.includes("del.title = 'Remove'"), 'Design QA remove button title should be localized');
 
 const qaMathHarness = (() => {
   const m = script.match(/function qaNormalizeRect\(rect, dispW, dispH\) \{[\s\S]*?\n\}/);
@@ -470,14 +507,15 @@ function extractFunctionBlock(source, name) {
 const qaNoteHarness = (() => {
   const edgeMatch = script.match(/const QA_MAX_AGENT_IMAGE_EDGE = \d+;/);
   assert(edgeMatch, 'QA_MAX_AGENT_IMAGE_EDGE constant is missing');
-  const names = ['qaPlanImageScale', 'qaClamp01', 'qaPixelCoord', 'qaPixelPoint', 'qaPixelRect', 'qaPixelArrow', 'qaEncodeAgentNote'];
+  const names = ['qaSanitizeAgentNoteText', 'qaPlanImageScale', 'qaClamp01', 'qaPixelCoord', 'qaPixelPoint', 'qaPixelRect', 'qaPixelArrow', 'qaEncodeAgentNote'];
   const blocks = names.map((name) => extractFunctionBlock(script, name)).join('\n');
-  return Function(`${edgeMatch[0]}\n${blocks}\nreturn { qaPlanImageScale, qaPixelRect, qaEncodeAgentNote };`)();
+  return Function(`${edgeMatch[0]}\n${blocks}\nreturn { qaSanitizeAgentNoteText, qaPlanImageScale, qaPixelRect, qaEncodeAgentNote };`)();
 })();
 const qaSmallScale = qaNoteHarness.qaPlanImageScale(640, 400);
 assert(qaSmallScale.width === 640 && qaSmallScale.height === 400 && qaSmallScale.factor === 1, 'qaPlanImageScale should keep images within the agent image edge unchanged');
 const qaLargeScale = qaNoteHarness.qaPlanImageScale(5000, 3000);
 assert(qaLargeScale.width === 1568 && qaLargeScale.height === 941 && qaLargeScale.factor < 1, 'qaPlanImageScale should downscale oversized images to the 1568px long edge');
+assert(qaNoteHarness.qaSanitizeAgentNoteText('bad ``` fence') === "bad ''' fence", 'qaSanitizeAgentNoteText should prevent fenced-block injection');
 const qaRect = qaNoteHarness.qaPixelRect({ x: 0.25, y: 0.5, w: 0.2, h: 0.1 }, 320, 200);
 assert(qaRect.x1 === 80 && qaRect.y1 === 100 && qaRect.x2 === 144 && qaRect.y2 === 120, 'qaPixelRect should map normalized labels to implementation pixels');
 const qaNote = qaNoteHarness.qaEncodeAgentNote(
@@ -486,7 +524,7 @@ const qaNote = qaNoteHarness.qaEncodeAgentNote(
   [
     { kind: 'point', x: 0.1, y: 0.2, note: 'small icon', category: 'typography' },
     { kind: 'rect', x: 0.25, y: 0.5, w: 0.2, h: 0.1, note: 'wrong color', category: 'color' },
-    { kind: 'arrow', x: 0.7, y: 0.1, x2: 0.8, y2: 0.4, note: 'move down', category: 'spacing' },
+    { kind: 'arrow', x: 0.7, y: 0.1, x2: 0.8, y2: 0.4, note: 'move ``` down', category: 'spacing' },
   ],
 );
 assert(qaNote.includes('```klic-qa-note v1'), 'qaEncodeAgentNote should use the KLIC agent-note fence');
@@ -496,6 +534,7 @@ assert(qaNote.includes('[1] point (32,40) "typography"'), 'qaEncodeAgentNote sho
 assert(qaNote.includes('[2] rect (80,100)-(144,120) "color"'), 'qaEncodeAgentNote should emit numbered rect coordinates in implementation pixels');
 assert(qaNote.includes('[3] arrow (224,20)->(256,80) "spacing"'), 'qaEncodeAgentNote should emit numbered arrow coordinates in implementation pixels');
 assert(qaNote.includes('    wrong color'), 'qaEncodeAgentNote should indent label notes');
-assert(qaNote.includes('    move down'), 'qaEncodeAgentNote should indent arrow notes');
+assert(qaNote.includes("    move ''' down"), 'qaEncodeAgentNote should sanitize and indent arrow notes');
+assert((qaNote.match(/```/g) || []).length === 2, 'qaEncodeAgentNote should only contain opening and closing fences');
 
 console.log('KLIC UI i18n and style import/export roundtrip smoke test passed.');
