@@ -125,6 +125,15 @@ assert(code.includes('function resizePluginUi') && code.includes('figma.ui.resiz
 assert(ui.includes('<title>KLIC Figma Toolkit</title>'), 'ui.html document title must match the manifest/plugin name');
 assert(ui.includes('<span class="brand">KLIC Figma Toolkit</span>'), 'ui.html brand label must match the manifest/plugin name');
 assert(
+  ui.includes('id="ux-checklist-list"')
+    && ui.includes('function uxChecklistAdd')
+    && ui.includes('function uxChecklistRender')
+    && ui.includes('function uxChecklistSaveEdit')
+    && ui.includes('function uxChecklistDelete')
+    && ui.includes('klic.uxChecklist.v1'),
+  'QA pane must provide persistent CRUD operations for the KLIC UI/UX checklist',
+);
+assert(
   ui.includes('id="command-guided-run"')
     && ui.includes('id="guided-step-style"')
     && ui.includes('id="guided-step-menu"')

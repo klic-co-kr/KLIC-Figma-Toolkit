@@ -473,6 +473,33 @@
       <div class="panel-desc" data-i18n="qa.desc">Run accessibility, component, and token governance checks.</div>
     </div>
 
+    <div class="workspace-panel ux-checklist-panel">
+      <div class="ux-checklist-head">
+        <div>
+          <div class="section-label" data-i18n="ux.title">KLIC UI/UX Checklist</div>
+          <div class="panel-desc" data-i18n="ux.desc">Manage project-specific review items and completion status.</div>
+        </div>
+        <button class="btn" id="ux-reset" data-i18n-title="ux.resetTitle" data-i18n="ux.reset">Reset defaults</button>
+      </div>
+      <div class="ux-progress-row">
+        <progress id="ux-progress" value="0" max="100"></progress>
+        <strong id="ux-progress-text">0 / 0</strong>
+      </div>
+      <div class="ux-checklist-toolbar" role="group" data-i18n-aria="ux.filterGroup">
+        <button class="ux-filter active" data-filter="all" data-i18n="ux.filterAll">All</button>
+        <button class="ux-filter" data-filter="open" data-i18n="ux.filterOpen">Open</button>
+        <button class="ux-filter" data-filter="done" data-i18n="ux.filterDone">Done</button>
+      </div>
+      <div class="ux-create-row">
+        <input type="text" id="ux-new-title" maxlength="120" data-i18n-ph="ux.newPlaceholder" placeholder="Add a review item">
+        <select id="ux-new-category" data-ux-category-select></select>
+        <label class="ux-required"><input type="checkbox" id="ux-new-required" checked><span data-i18n="ux.required">Required</span></label>
+        <button class="btn btn-primary" id="ux-add" data-i18n="ux.add">Add</button>
+      </div>
+      <div class="ux-checklist-list" id="ux-checklist-list"></div>
+      <div class="hint" id="ux-empty" data-i18n="ux.empty" style="display:none">No checklist items in this view.</div>
+    </div>
+
     <div class="workspace-panel">
       <div class="workspace-options">
         <label><span data-i18n="command.scanLimit">Scan limit</span><input type="number" id="command-scan-limit" value="2000" min="50" max="10000"></label>

@@ -219,6 +219,9 @@ async function run() {
           checks.qaPane = document.querySelector('.tool-pane.active')?.id || '';
           checks.qaActions = [...document.querySelectorAll('#pane-qa button')].map((el) => el.id).filter(Boolean);
           checks.qaResultList = !!document.getElementById('qa-result-list');
+          checks.uxChecklistCount = document.querySelectorAll('#ux-checklist-list .ux-check-item').length;
+          checks.uxChecklistOverflow = [...document.querySelectorAll('.ux-checklist-panel input, .ux-checklist-panel select, .ux-checklist-panel button')]
+            .some((el) => el.scrollWidth > el.clientWidth + 1);
           switchTool('handoff');
           checks.handoffPane = document.querySelector('.tool-pane.active')?.id || '';
           checks.handoffActions = [...document.querySelectorAll('#pane-handoff button')].map((el) => el.id).filter(Boolean);
@@ -236,12 +239,52 @@ async function run() {
     assert(workspaceValue.qaActions.includes('command-component-qa'), 'QA pane should expose Component QA');
     assert(workspaceValue.qaActions.includes('command-token-governance'), 'QA pane should expose Token Governance');
     assert(workspaceValue.qaResultList === true, 'QA pane should include qa-result-list');
+    assert(workspaceValue.uxChecklistCount === 13, `QA pane should render 13 KLIC checklist defaults, got ${workspaceValue.uxChecklistCount}`);
+    assert(workspaceValue.uxChecklistOverflow === false, 'UI/UX checklist controls should not overflow their containers');
     assert(workspaceValue.handoffPane === 'pane-handoff', `Handoff tool tab should activate pane-handoff, got ${workspaceValue.handoffPane}`);
     assert(workspaceValue.handoffActions.includes('command-export-tokens'), 'Handoff pane should expose token export');
     assert(workspaceValue.handoffActions.includes('command-run-smoke-test'), 'Handoff pane should expose smoke test');
     assert(workspaceValue.handoffActions.includes('command-open-folder-maker'), 'Handoff pane should expose Folder Maker');
     assert(workspaceValue.handoffResultList === true, 'Handoff pane should include handoff-result-list');
     assert(workspaceValue.styleBindingList === true, 'Style pane should include style-binding-list');
+
+    const checklistCrudResult = await send('Runtime.evaluate', {
+      returnByValue: true,
+      expression: `
+        (() => {
+          switchTool('qa');
+          const initial = uxChecklistItems.length;
+          document.getElementById('ux-new-title').value = 'CRUD smoke item';
+          document.getElementById('ux-new-category').value = 'interaction';
+          document.getElementById('ux-new-required').checked = true;
+          uxChecklistAdd();
+          const created = uxChecklistItems[uxChecklistItems.length - 1];
+          uxChecklistEditingId = created.id;
+          uxChecklistRender();
+          const editRow = document.querySelector('.ux-edit-row');
+          editRow.querySelector('[data-edit-title]').value = 'CRUD smoke item updated';
+          uxChecklistSaveEdit(created.id, editRow);
+          const updated = uxChecklistItems.find((item) => item.id === created.id);
+          uxChecklistToggle(created.id, true);
+          const completed = uxChecklistItems.find((item) => item.id === created.id)?.done === true;
+          window.confirm = () => true;
+          uxChecklistDelete(created.id);
+          return {
+            initial,
+            afterDelete: uxChecklistItems.length,
+            updatedTitle: updated?.title || '',
+            completed,
+            stored: !!localStorage.getItem('klic.uxChecklist.v1'),
+          };
+        })()
+      `,
+    });
+    const checklistCrud = checklistCrudResult.result?.value;
+    assert(checklistCrud?.initial === 13, `Checklist CRUD should start with 13 defaults, got ${checklistCrud?.initial}`);
+    assert(checklistCrud.afterDelete === 13, `Checklist CRUD delete should restore 13 items, got ${checklistCrud.afterDelete}`);
+    assert(checklistCrud.updatedTitle === 'CRUD smoke item updated', 'Checklist CRUD update did not persist the edited title');
+    assert(checklistCrud.completed === true, 'Checklist CRUD toggle did not persist completion state');
+    assert(checklistCrud.stored === true, 'Checklist CRUD operations should persist to localStorage');
 
     await send('Runtime.evaluate', {
       awaitPromise: true,

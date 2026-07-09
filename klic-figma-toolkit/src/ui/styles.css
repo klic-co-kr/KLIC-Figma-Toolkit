@@ -153,6 +153,35 @@
   .workspace-options input { height: 28px; font-size: 11px; }
   .workspace-options .inline-option { flex-direction: row; align-items: center; color: #ccc; }
   .workspace-options .inline-option input { height: auto; width: auto; accent-color: #18a0fb; }
+  .ux-checklist-panel { gap: 8px; }
+  .ux-checklist-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .ux-checklist-head .btn { flex: 0 0 auto; padding: 5px 8px; font-size: 10px; }
+  .ux-progress-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; }
+  .ux-progress-row progress { width: 100%; height: 8px; accent-color: #3dd68c; }
+  .ux-progress-row strong { min-width: 48px; color: #ccc; font-size: 10px; text-align: right; }
+  .ux-checklist-toolbar { display: flex; align-items: center; width: fit-content; border: 1px solid #3a3a3a; border-radius: 6px; overflow: hidden; }
+  .ux-filter { min-width: 54px; padding: 5px 9px; border: 0; border-right: 1px solid #3a3a3a; background: #222; color: #888; font-size: 10px; cursor: pointer; }
+  .ux-filter:last-child { border-right: 0; }
+  .ux-filter.active { background: #18577d; color: #fff; }
+  .ux-create-row { display: grid; grid-template-columns: minmax(140px, 1fr) 120px auto auto; gap: 6px; align-items: center; }
+  .ux-create-row input[type="text"], .ux-create-row select { width: 100%; min-width: 0; height: 30px; font-size: 10px; }
+  .ux-required { display: flex; align-items: center; gap: 4px; color: #aaa; font-size: 10px; white-space: nowrap; }
+  .ux-required input { accent-color: #18a0fb; }
+  .ux-create-row .btn-primary { flex: 0 0 auto; padding: 7px 10px; font-size: 10px; }
+  .ux-checklist-list { display: flex; flex-direction: column; gap: 4px; max-height: 270px; overflow-y: auto; }
+  .ux-check-item { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 7px; align-items: center; min-height: 38px; padding: 6px 7px; border: 1px solid #303030; border-radius: 6px; background: #1c1c1c; }
+  .ux-check-item.done { opacity: 0.65; }
+  .ux-check-item.done .ux-item-title { text-decoration: line-through; }
+  .ux-check-item > input[type="checkbox"] { accent-color: #3dd68c; }
+  .ux-item-copy { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .ux-item-title { overflow-wrap: anywhere; color: #e5e5e5; font-size: 11px; line-height: 1.35; }
+  .ux-item-meta { display: flex; gap: 5px; align-items: center; color: #777; font-size: 9px; }
+  .ux-item-required { color: #ff8f7d; }
+  .ux-item-actions { display: flex; gap: 3px; }
+  .ux-icon-btn { width: 25px; height: 25px; display: grid; place-items: center; border: 1px solid #3a3a3a; border-radius: 5px; background: #252525; color: #aaa; font-size: 12px; cursor: pointer; }
+  .ux-icon-btn:hover { border-color: #18a0fb; color: #fff; }
+  .ux-edit-row { grid-column: 2 / -1; display: grid; grid-template-columns: minmax(120px, 1fr) 120px auto auto auto; gap: 5px; align-items: center; }
+  .ux-edit-row input[type="text"], .ux-edit-row select { min-width: 0; width: 100%; height: 28px; font-size: 10px; }
   .binding-list { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; max-height: 150px; overflow-y: auto; }
   .binding-list.evidence-mode { max-height: none; overflow: visible; }
   .binding-item {

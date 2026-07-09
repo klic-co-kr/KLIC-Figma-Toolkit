@@ -49,6 +49,7 @@ function applyLang() {
   menuRenderFilterTags();
   menuUpdateCount();
   tableRefreshDetected();
+  uxChecklistRender();
 }
 function setLang(l) {
   LANG = I18N[l] ? l : 'en';
@@ -2008,6 +2009,234 @@ document.getElementById('table-generate').addEventListener('click', () => {
       meta: { tableConfig, diagnostics },
     }
   }, '*');
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODULE: KLIC UI/UX CHECKLIST
+   ═══════════════════════════════════════════════════════════════════════════ */
+const UX_CHECKLIST_STORAGE_KEY = 'klic.uxChecklist.v1';
+const UX_CHECKLIST_CATEGORIES = ['accessibility', 'design-system', 'responsive', 'interaction', 'content', 'handoff'];
+const UX_CHECKLIST_DEFAULTS = [
+  ['ux.default.contrast', 'accessibility', true],
+  ['ux.default.target', 'accessibility', true],
+  ['ux.default.keyboard', 'accessibility', true],
+  ['ux.default.tokens', 'design-system', true],
+  ['ux.default.components', 'design-system', true],
+  ['ux.default.responsive', 'responsive', true],
+  ['ux.default.navigation', 'interaction', true],
+  ['ux.default.forms', 'interaction', true],
+  ['ux.default.tables', 'content', true],
+  ['ux.default.states', 'interaction', true],
+  ['ux.default.copy', 'content', false],
+  ['ux.default.qaDiff', 'handoff', true],
+  ['ux.default.handoff', 'handoff', true],
+];
+
+function uxChecklistDefaultItems() {
+  return UX_CHECKLIST_DEFAULTS.map((item, index) => ({
+    id: 'klic-default-' + (index + 1),
+    titleKey: item[0],
+    category: item[1],
+    required: item[2],
+    done: false,
+  }));
+}
+
+function uxChecklistLoad() {
+  const raw = safeStorageGet(UX_CHECKLIST_STORAGE_KEY);
+  if (!raw) return uxChecklistDefaultItems();
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return uxChecklistDefaultItems();
+    return parsed.filter(item => item && typeof item.id === 'string' && UX_CHECKLIST_CATEGORIES.includes(item.category)).slice(0, 200);
+  } catch (err) {
+    return uxChecklistDefaultItems();
+  }
+}
+
+let uxChecklistItems = uxChecklistLoad();
+let uxChecklistFilter = 'all';
+let uxChecklistEditingId = '';
+
+function uxChecklistSave() {
+  safeStorageSet(UX_CHECKLIST_STORAGE_KEY, JSON.stringify(uxChecklistItems));
+}
+
+function uxChecklistTitle(item) {
+  return item.title || t(item.titleKey || '');
+}
+
+function uxChecklistPopulateCategories() {
+  document.querySelectorAll('[data-ux-category-select]').forEach(select => {
+    const current = select.value;
+    select.innerHTML = '';
+    UX_CHECKLIST_CATEGORIES.forEach(category => {
+      const option = document.createElement('option');
+      option.value = category;
+      option.textContent = t('ux.category.' + category);
+      select.appendChild(option);
+    });
+    select.value = UX_CHECKLIST_CATEGORIES.includes(current) ? current : UX_CHECKLIST_CATEGORIES[0];
+  });
+}
+
+function uxChecklistSetFilter(filter) {
+  uxChecklistFilter = ['all', 'open', 'done'].includes(filter) ? filter : 'all';
+  uxChecklistRender();
+}
+
+function uxChecklistToggle(id, done) {
+  const item = uxChecklistItems.find(entry => entry.id === id);
+  if (!item) return;
+  item.done = !!done;
+  uxChecklistSave();
+  uxChecklistRender();
+}
+
+function uxChecklistDelete(id) {
+  const item = uxChecklistItems.find(entry => entry.id === id);
+  if (!item || !confirm(t('ux.deleteConfirm', uxChecklistTitle(item)))) return;
+  uxChecklistItems = uxChecklistItems.filter(entry => entry.id !== id);
+  uxChecklistSave();
+  uxChecklistRender();
+}
+
+function uxChecklistAdd() {
+  const titleInput = document.getElementById('ux-new-title');
+  const title = titleInput.value.trim().slice(0, 120);
+  if (!title || uxChecklistItems.length >= 200) return;
+  uxChecklistItems.push({
+    id: 'ux-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7),
+    title,
+    category: document.getElementById('ux-new-category').value,
+    required: document.getElementById('ux-new-required').checked,
+    done: false,
+  });
+  titleInput.value = '';
+  uxChecklistSave();
+  uxChecklistRender();
+  titleInput.focus();
+}
+
+function uxChecklistSaveEdit(id, row) {
+  const item = uxChecklistItems.find(entry => entry.id === id);
+  const title = row.querySelector('[data-edit-title]').value.trim().slice(0, 120);
+  if (!item || !title) return;
+  item.title = title;
+  delete item.titleKey;
+  item.category = row.querySelector('[data-edit-category]').value;
+  item.required = row.querySelector('[data-edit-required]').checked;
+  uxChecklistEditingId = '';
+  uxChecklistSave();
+  uxChecklistRender();
+}
+
+function uxChecklistCreateIconButton(symbol, titleKey, onClick) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'ux-icon-btn';
+  button.textContent = symbol;
+  button.title = t(titleKey);
+  button.setAttribute('aria-label', t(titleKey));
+  button.addEventListener('click', onClick);
+  return button;
+}
+
+function uxChecklistRenderEdit(item, container) {
+  const edit = document.createElement('div');
+  edit.className = 'ux-edit-row';
+  const title = document.createElement('input');
+  title.type = 'text';
+  title.maxLength = 120;
+  title.value = uxChecklistTitle(item);
+  title.setAttribute('data-edit-title', '');
+  const category = document.createElement('select');
+  category.setAttribute('data-edit-category', '');
+  UX_CHECKLIST_CATEGORIES.forEach(value => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = t('ux.category.' + value);
+    option.selected = value === item.category;
+    category.appendChild(option);
+  });
+  const required = document.createElement('label');
+  required.className = 'ux-required';
+  const requiredCheck = document.createElement('input');
+  requiredCheck.type = 'checkbox';
+  requiredCheck.checked = !!item.required;
+  requiredCheck.setAttribute('data-edit-required', '');
+  const requiredText = document.createElement('span');
+  requiredText.textContent = t('ux.required');
+  required.appendChild(requiredCheck);
+  required.appendChild(requiredText);
+  edit.appendChild(title);
+  edit.appendChild(category);
+  edit.appendChild(required);
+  edit.appendChild(uxChecklistCreateIconButton('✓', 'ux.save', () => uxChecklistSaveEdit(item.id, edit)));
+  edit.appendChild(uxChecklistCreateIconButton('×', 'ux.cancel', () => { uxChecklistEditingId = ''; uxChecklistRender(); }));
+  container.appendChild(edit);
+  setTimeout(() => title.focus(), 0);
+}
+
+function uxChecklistRender() {
+  const list = document.getElementById('ux-checklist-list');
+  if (!list) return;
+  uxChecklistPopulateCategories();
+  document.querySelectorAll('.ux-filter').forEach(button => button.classList.toggle('active', button.dataset.filter === uxChecklistFilter));
+  const done = uxChecklistItems.filter(item => item.done).length;
+  const total = uxChecklistItems.length;
+  document.getElementById('ux-progress').value = total ? Math.round(done / total * 100) : 0;
+  document.getElementById('ux-progress-text').textContent = t('ux.progress', done, total);
+  const visible = uxChecklistItems.filter(item => uxChecklistFilter === 'all' || (uxChecklistFilter === 'done' ? item.done : !item.done));
+  list.innerHTML = '';
+  visible.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'ux-check-item' + (item.done ? ' done' : '');
+    const check = document.createElement('input');
+    check.type = 'checkbox';
+    check.checked = !!item.done;
+    check.setAttribute('aria-label', uxChecklistTitle(item));
+    check.addEventListener('change', () => uxChecklistToggle(item.id, check.checked));
+    const copy = document.createElement('div');
+    copy.className = 'ux-item-copy';
+    const title = document.createElement('div');
+    title.className = 'ux-item-title';
+    title.textContent = uxChecklistTitle(item);
+    const meta = document.createElement('div');
+    meta.className = 'ux-item-meta';
+    const category = document.createElement('span');
+    category.textContent = t('ux.category.' + item.category);
+    meta.appendChild(category);
+    if (item.required) {
+      const required = document.createElement('span');
+      required.className = 'ux-item-required';
+      required.textContent = t('ux.required');
+      meta.appendChild(required);
+    }
+    copy.appendChild(title);
+    copy.appendChild(meta);
+    const actions = document.createElement('div');
+    actions.className = 'ux-item-actions';
+    actions.appendChild(uxChecklistCreateIconButton('✎', 'ux.edit', () => { uxChecklistEditingId = item.id; uxChecklistRender(); }));
+    actions.appendChild(uxChecklistCreateIconButton('×', 'ux.delete', () => uxChecklistDelete(item.id)));
+    row.appendChild(check);
+    row.appendChild(copy);
+    row.appendChild(actions);
+    if (uxChecklistEditingId === item.id) uxChecklistRenderEdit(item, row);
+    list.appendChild(row);
+  });
+  document.getElementById('ux-empty').style.display = visible.length ? 'none' : 'block';
+}
+
+document.getElementById('ux-add').addEventListener('click', uxChecklistAdd);
+document.getElementById('ux-new-title').addEventListener('keydown', event => { if (event.key === 'Enter') uxChecklistAdd(); });
+document.querySelectorAll('.ux-filter').forEach(button => button.addEventListener('click', () => uxChecklistSetFilter(button.dataset.filter)));
+document.getElementById('ux-reset').addEventListener('click', () => {
+  if (!confirm(t('ux.resetConfirm'))) return;
+  uxChecklistItems = uxChecklistDefaultItems();
+  uxChecklistEditingId = '';
+  uxChecklistSave();
+  uxChecklistRender();
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════

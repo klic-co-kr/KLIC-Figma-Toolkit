@@ -160,6 +160,35 @@
   .workspace-options input { height: 28px; font-size: 11px; }
   .workspace-options .inline-option { flex-direction: row; align-items: center; color: #ccc; }
   .workspace-options .inline-option input { height: auto; width: auto; accent-color: #18a0fb; }
+  .ux-checklist-panel { gap: 8px; }
+  .ux-checklist-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .ux-checklist-head .btn { flex: 0 0 auto; padding: 5px 8px; font-size: 10px; }
+  .ux-progress-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; }
+  .ux-progress-row progress { width: 100%; height: 8px; accent-color: #3dd68c; }
+  .ux-progress-row strong { min-width: 48px; color: #ccc; font-size: 10px; text-align: right; }
+  .ux-checklist-toolbar { display: flex; align-items: center; width: fit-content; border: 1px solid #3a3a3a; border-radius: 6px; overflow: hidden; }
+  .ux-filter { min-width: 54px; padding: 5px 9px; border: 0; border-right: 1px solid #3a3a3a; background: #222; color: #888; font-size: 10px; cursor: pointer; }
+  .ux-filter:last-child { border-right: 0; }
+  .ux-filter.active { background: #18577d; color: #fff; }
+  .ux-create-row { display: grid; grid-template-columns: minmax(140px, 1fr) 120px auto auto; gap: 6px; align-items: center; }
+  .ux-create-row input[type="text"], .ux-create-row select { width: 100%; min-width: 0; height: 30px; font-size: 10px; }
+  .ux-required { display: flex; align-items: center; gap: 4px; color: #aaa; font-size: 10px; white-space: nowrap; }
+  .ux-required input { accent-color: #18a0fb; }
+  .ux-create-row .btn-primary { flex: 0 0 auto; padding: 7px 10px; font-size: 10px; }
+  .ux-checklist-list { display: flex; flex-direction: column; gap: 4px; max-height: 270px; overflow-y: auto; }
+  .ux-check-item { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 7px; align-items: center; min-height: 38px; padding: 6px 7px; border: 1px solid #303030; border-radius: 6px; background: #1c1c1c; }
+  .ux-check-item.done { opacity: 0.65; }
+  .ux-check-item.done .ux-item-title { text-decoration: line-through; }
+  .ux-check-item > input[type="checkbox"] { accent-color: #3dd68c; }
+  .ux-item-copy { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .ux-item-title { overflow-wrap: anywhere; color: #e5e5e5; font-size: 11px; line-height: 1.35; }
+  .ux-item-meta { display: flex; gap: 5px; align-items: center; color: #777; font-size: 9px; }
+  .ux-item-required { color: #ff8f7d; }
+  .ux-item-actions { display: flex; gap: 3px; }
+  .ux-icon-btn { width: 25px; height: 25px; display: grid; place-items: center; border: 1px solid #3a3a3a; border-radius: 5px; background: #252525; color: #aaa; font-size: 12px; cursor: pointer; }
+  .ux-icon-btn:hover { border-color: #18a0fb; color: #fff; }
+  .ux-edit-row { grid-column: 2 / -1; display: grid; grid-template-columns: minmax(120px, 1fr) 120px auto auto auto; gap: 5px; align-items: center; }
+  .ux-edit-row input[type="text"], .ux-edit-row select { min-width: 0; width: 100%; height: 28px; font-size: 10px; }
   .binding-list { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; max-height: 150px; overflow-y: auto; }
   .binding-list.evidence-mode { max-height: none; overflow: visible; }
   .binding-item {
@@ -908,6 +937,33 @@
       <div class="panel-desc" data-i18n="qa.desc">Run accessibility, component, and token governance checks.</div>
     </div>
 
+    <div class="workspace-panel ux-checklist-panel">
+      <div class="ux-checklist-head">
+        <div>
+          <div class="section-label" data-i18n="ux.title">KLIC UI/UX Checklist</div>
+          <div class="panel-desc" data-i18n="ux.desc">Manage project-specific review items and completion status.</div>
+        </div>
+        <button class="btn" id="ux-reset" data-i18n-title="ux.resetTitle" data-i18n="ux.reset">Reset defaults</button>
+      </div>
+      <div class="ux-progress-row">
+        <progress id="ux-progress" value="0" max="100"></progress>
+        <strong id="ux-progress-text">0 / 0</strong>
+      </div>
+      <div class="ux-checklist-toolbar" role="group" data-i18n-aria="ux.filterGroup">
+        <button class="ux-filter active" data-filter="all" data-i18n="ux.filterAll">All</button>
+        <button class="ux-filter" data-filter="open" data-i18n="ux.filterOpen">Open</button>
+        <button class="ux-filter" data-filter="done" data-i18n="ux.filterDone">Done</button>
+      </div>
+      <div class="ux-create-row">
+        <input type="text" id="ux-new-title" maxlength="120" data-i18n-ph="ux.newPlaceholder" placeholder="Add a review item">
+        <select id="ux-new-category" data-ux-category-select></select>
+        <label class="ux-required"><input type="checkbox" id="ux-new-required" checked><span data-i18n="ux.required">Required</span></label>
+        <button class="btn btn-primary" id="ux-add" data-i18n="ux.add">Add</button>
+      </div>
+      <div class="ux-checklist-list" id="ux-checklist-list"></div>
+      <div class="hint" id="ux-empty" data-i18n="ux.empty" style="display:none">No checklist items in this view.</div>
+    </div>
+
     <div class="workspace-panel">
       <div class="workspace-options">
         <label><span data-i18n="command.scanLimit">Scan limit</span><input type="number" id="command-scan-limit" value="2000" min="50" max="10000"></label>
@@ -1138,6 +1194,44 @@ const I18N = {
 
     'qa.title': 'Quality Assurance',
     'qa.desc': 'Run accessibility, component, and token governance checks.',
+    'ux.title': 'KLIC UI/UX Checklist',
+    'ux.desc': 'Manage project-specific review items and completion status.',
+    'ux.reset': 'Reset defaults',
+    'ux.resetTitle': 'Replace the current checklist with KLIC defaults',
+    'ux.resetConfirm': 'Replace the current checklist with KLIC defaults?',
+    'ux.filterGroup': 'Checklist status filter',
+    'ux.filterAll': 'All',
+    'ux.filterOpen': 'Open',
+    'ux.filterDone': 'Done',
+    'ux.newPlaceholder': 'Add a review item',
+    'ux.required': 'Required',
+    'ux.add': 'Add',
+    'ux.empty': 'No checklist items in this view.',
+    'ux.progress': (done, total) => `${done} / ${total}`,
+    'ux.edit': 'Edit item',
+    'ux.delete': 'Delete item',
+    'ux.save': 'Save changes',
+    'ux.cancel': 'Cancel editing',
+    'ux.deleteConfirm': (title) => `Delete “${title}”?`,
+    'ux.category.accessibility': 'Accessibility',
+    'ux.category.design-system': 'Design system',
+    'ux.category.responsive': 'Responsive',
+    'ux.category.interaction': 'Interaction',
+    'ux.category.content': 'Content',
+    'ux.category.handoff': 'Handoff',
+    'ux.default.contrast': 'Text and non-text contrast meets KWCAG/KRDS requirements',
+    'ux.default.target': 'Interactive targets are at least 44 × 44 px',
+    'ux.default.keyboard': 'Keyboard order and visible focus states are complete',
+    'ux.default.tokens': 'Colors, spacing, radius, and typography use approved tokens',
+    'ux.default.components': 'Components cover default, hover, focus, disabled, and error states',
+    'ux.default.responsive': 'Desktop, tablet, and mobile layouts have been reviewed',
+    'ux.default.navigation': 'Menu hierarchy, current location, and back navigation are clear',
+    'ux.default.forms': 'Labels, required fields, validation, and recovery messages are clear',
+    'ux.default.tables': 'Tables have headers, readable alignment, and narrow-screen behavior',
+    'ux.default.states': 'Loading, empty, error, success, and permission states are designed',
+    'ux.default.copy': 'Korean labels and instructions are concise and consistent',
+    'ux.default.qaDiff': 'Implementation differences are recorded in Design QA Diff',
+    'ux.default.handoff': 'Tokens, annotations, and known exceptions are included in handoff',
     'handoff.title': 'Handoff',
     'handoff.desc': 'Export tokens, create reports, run runtime smoke checks, and open delivery utilities.',
 
@@ -1437,6 +1531,44 @@ const I18N = {
 
     'qa.title': '품질 검수',
     'qa.desc': '접근성, 컴포넌트, 토큰 거버넌스 검사를 실행합니다.',
+    'ux.title': 'KLIC UI/UX 체크리스트',
+    'ux.desc': '프로젝트 검수 항목과 완료 상태를 직접 관리합니다.',
+    'ux.reset': '기본값 복원',
+    'ux.resetTitle': '현재 체크리스트를 KLIC 기본 항목으로 교체',
+    'ux.resetConfirm': '현재 체크리스트를 KLIC 기본 항목으로 교체할까요?',
+    'ux.filterGroup': '체크리스트 상태 필터',
+    'ux.filterAll': '전체',
+    'ux.filterOpen': '미완료',
+    'ux.filterDone': '완료',
+    'ux.newPlaceholder': '검수 항목 추가',
+    'ux.required': '필수',
+    'ux.add': '추가',
+    'ux.empty': '이 조건에 해당하는 체크리스트 항목이 없습니다.',
+    'ux.progress': (done, total) => `${done} / ${total}`,
+    'ux.edit': '항목 수정',
+    'ux.delete': '항목 삭제',
+    'ux.save': '변경 저장',
+    'ux.cancel': '수정 취소',
+    'ux.deleteConfirm': (title) => `“${title}” 항목을 삭제할까요?`,
+    'ux.category.accessibility': '접근성',
+    'ux.category.design-system': '디자인 시스템',
+    'ux.category.responsive': '반응형',
+    'ux.category.interaction': '인터랙션',
+    'ux.category.content': '콘텐츠',
+    'ux.category.handoff': '핸드오프',
+    'ux.default.contrast': '텍스트·비텍스트 명도 대비가 KWCAG/KRDS 기준을 충족한다',
+    'ux.default.target': '인터랙션 대상의 크기가 최소 44 × 44px이다',
+    'ux.default.keyboard': '키보드 이동 순서와 포커스 표시가 완성되어 있다',
+    'ux.default.tokens': '색상·여백·둥글기·타이포그래피에 승인된 토큰을 사용한다',
+    'ux.default.components': '컴포넌트에 기본·호버·포커스·비활성·오류 상태가 있다',
+    'ux.default.responsive': '데스크톱·태블릿·모바일 레이아웃을 모두 검수했다',
+    'ux.default.navigation': '메뉴 계층·현재 위치·뒤로가기가 명확하다',
+    'ux.default.forms': '레이블·필수값·검증·오류 복구 문구가 명확하다',
+    'ux.default.tables': '테이블 헤더·정렬·좁은 화면 대응이 적절하다',
+    'ux.default.states': '로딩·빈 화면·오류·성공·권한 상태가 설계되어 있다',
+    'ux.default.copy': '한국어 레이블과 안내 문구가 간결하고 일관적이다',
+    'ux.default.qaDiff': '구현 차이를 Design QA Diff에 기록했다',
+    'ux.default.handoff': '토큰·주석·알려진 예외를 핸드오프에 포함했다',
     'handoff.title': '핸드오프',
     'handoff.desc': '토큰 내보내기, 리포트 생성, 런타임 스모크 체크, 전달 유틸리티를 실행합니다.',
 
@@ -1650,6 +1782,7 @@ function applyLang() {
   menuRenderFilterTags();
   menuUpdateCount();
   tableRefreshDetected();
+  uxChecklistRender();
 }
 function setLang(l) {
   LANG = I18N[l] ? l : 'en';
@@ -3609,6 +3742,234 @@ document.getElementById('table-generate').addEventListener('click', () => {
       meta: { tableConfig, diagnostics },
     }
   }, '*');
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODULE: KLIC UI/UX CHECKLIST
+   ═══════════════════════════════════════════════════════════════════════════ */
+const UX_CHECKLIST_STORAGE_KEY = 'klic.uxChecklist.v1';
+const UX_CHECKLIST_CATEGORIES = ['accessibility', 'design-system', 'responsive', 'interaction', 'content', 'handoff'];
+const UX_CHECKLIST_DEFAULTS = [
+  ['ux.default.contrast', 'accessibility', true],
+  ['ux.default.target', 'accessibility', true],
+  ['ux.default.keyboard', 'accessibility', true],
+  ['ux.default.tokens', 'design-system', true],
+  ['ux.default.components', 'design-system', true],
+  ['ux.default.responsive', 'responsive', true],
+  ['ux.default.navigation', 'interaction', true],
+  ['ux.default.forms', 'interaction', true],
+  ['ux.default.tables', 'content', true],
+  ['ux.default.states', 'interaction', true],
+  ['ux.default.copy', 'content', false],
+  ['ux.default.qaDiff', 'handoff', true],
+  ['ux.default.handoff', 'handoff', true],
+];
+
+function uxChecklistDefaultItems() {
+  return UX_CHECKLIST_DEFAULTS.map((item, index) => ({
+    id: 'klic-default-' + (index + 1),
+    titleKey: item[0],
+    category: item[1],
+    required: item[2],
+    done: false,
+  }));
+}
+
+function uxChecklistLoad() {
+  const raw = safeStorageGet(UX_CHECKLIST_STORAGE_KEY);
+  if (!raw) return uxChecklistDefaultItems();
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return uxChecklistDefaultItems();
+    return parsed.filter(item => item && typeof item.id === 'string' && UX_CHECKLIST_CATEGORIES.includes(item.category)).slice(0, 200);
+  } catch (err) {
+    return uxChecklistDefaultItems();
+  }
+}
+
+let uxChecklistItems = uxChecklistLoad();
+let uxChecklistFilter = 'all';
+let uxChecklistEditingId = '';
+
+function uxChecklistSave() {
+  safeStorageSet(UX_CHECKLIST_STORAGE_KEY, JSON.stringify(uxChecklistItems));
+}
+
+function uxChecklistTitle(item) {
+  return item.title || t(item.titleKey || '');
+}
+
+function uxChecklistPopulateCategories() {
+  document.querySelectorAll('[data-ux-category-select]').forEach(select => {
+    const current = select.value;
+    select.innerHTML = '';
+    UX_CHECKLIST_CATEGORIES.forEach(category => {
+      const option = document.createElement('option');
+      option.value = category;
+      option.textContent = t('ux.category.' + category);
+      select.appendChild(option);
+    });
+    select.value = UX_CHECKLIST_CATEGORIES.includes(current) ? current : UX_CHECKLIST_CATEGORIES[0];
+  });
+}
+
+function uxChecklistSetFilter(filter) {
+  uxChecklistFilter = ['all', 'open', 'done'].includes(filter) ? filter : 'all';
+  uxChecklistRender();
+}
+
+function uxChecklistToggle(id, done) {
+  const item = uxChecklistItems.find(entry => entry.id === id);
+  if (!item) return;
+  item.done = !!done;
+  uxChecklistSave();
+  uxChecklistRender();
+}
+
+function uxChecklistDelete(id) {
+  const item = uxChecklistItems.find(entry => entry.id === id);
+  if (!item || !confirm(t('ux.deleteConfirm', uxChecklistTitle(item)))) return;
+  uxChecklistItems = uxChecklistItems.filter(entry => entry.id !== id);
+  uxChecklistSave();
+  uxChecklistRender();
+}
+
+function uxChecklistAdd() {
+  const titleInput = document.getElementById('ux-new-title');
+  const title = titleInput.value.trim().slice(0, 120);
+  if (!title || uxChecklistItems.length >= 200) return;
+  uxChecklistItems.push({
+    id: 'ux-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7),
+    title,
+    category: document.getElementById('ux-new-category').value,
+    required: document.getElementById('ux-new-required').checked,
+    done: false,
+  });
+  titleInput.value = '';
+  uxChecklistSave();
+  uxChecklistRender();
+  titleInput.focus();
+}
+
+function uxChecklistSaveEdit(id, row) {
+  const item = uxChecklistItems.find(entry => entry.id === id);
+  const title = row.querySelector('[data-edit-title]').value.trim().slice(0, 120);
+  if (!item || !title) return;
+  item.title = title;
+  delete item.titleKey;
+  item.category = row.querySelector('[data-edit-category]').value;
+  item.required = row.querySelector('[data-edit-required]').checked;
+  uxChecklistEditingId = '';
+  uxChecklistSave();
+  uxChecklistRender();
+}
+
+function uxChecklistCreateIconButton(symbol, titleKey, onClick) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'ux-icon-btn';
+  button.textContent = symbol;
+  button.title = t(titleKey);
+  button.setAttribute('aria-label', t(titleKey));
+  button.addEventListener('click', onClick);
+  return button;
+}
+
+function uxChecklistRenderEdit(item, container) {
+  const edit = document.createElement('div');
+  edit.className = 'ux-edit-row';
+  const title = document.createElement('input');
+  title.type = 'text';
+  title.maxLength = 120;
+  title.value = uxChecklistTitle(item);
+  title.setAttribute('data-edit-title', '');
+  const category = document.createElement('select');
+  category.setAttribute('data-edit-category', '');
+  UX_CHECKLIST_CATEGORIES.forEach(value => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = t('ux.category.' + value);
+    option.selected = value === item.category;
+    category.appendChild(option);
+  });
+  const required = document.createElement('label');
+  required.className = 'ux-required';
+  const requiredCheck = document.createElement('input');
+  requiredCheck.type = 'checkbox';
+  requiredCheck.checked = !!item.required;
+  requiredCheck.setAttribute('data-edit-required', '');
+  const requiredText = document.createElement('span');
+  requiredText.textContent = t('ux.required');
+  required.appendChild(requiredCheck);
+  required.appendChild(requiredText);
+  edit.appendChild(title);
+  edit.appendChild(category);
+  edit.appendChild(required);
+  edit.appendChild(uxChecklistCreateIconButton('✓', 'ux.save', () => uxChecklistSaveEdit(item.id, edit)));
+  edit.appendChild(uxChecklistCreateIconButton('×', 'ux.cancel', () => { uxChecklistEditingId = ''; uxChecklistRender(); }));
+  container.appendChild(edit);
+  setTimeout(() => title.focus(), 0);
+}
+
+function uxChecklistRender() {
+  const list = document.getElementById('ux-checklist-list');
+  if (!list) return;
+  uxChecklistPopulateCategories();
+  document.querySelectorAll('.ux-filter').forEach(button => button.classList.toggle('active', button.dataset.filter === uxChecklistFilter));
+  const done = uxChecklistItems.filter(item => item.done).length;
+  const total = uxChecklistItems.length;
+  document.getElementById('ux-progress').value = total ? Math.round(done / total * 100) : 0;
+  document.getElementById('ux-progress-text').textContent = t('ux.progress', done, total);
+  const visible = uxChecklistItems.filter(item => uxChecklistFilter === 'all' || (uxChecklistFilter === 'done' ? item.done : !item.done));
+  list.innerHTML = '';
+  visible.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'ux-check-item' + (item.done ? ' done' : '');
+    const check = document.createElement('input');
+    check.type = 'checkbox';
+    check.checked = !!item.done;
+    check.setAttribute('aria-label', uxChecklistTitle(item));
+    check.addEventListener('change', () => uxChecklistToggle(item.id, check.checked));
+    const copy = document.createElement('div');
+    copy.className = 'ux-item-copy';
+    const title = document.createElement('div');
+    title.className = 'ux-item-title';
+    title.textContent = uxChecklistTitle(item);
+    const meta = document.createElement('div');
+    meta.className = 'ux-item-meta';
+    const category = document.createElement('span');
+    category.textContent = t('ux.category.' + item.category);
+    meta.appendChild(category);
+    if (item.required) {
+      const required = document.createElement('span');
+      required.className = 'ux-item-required';
+      required.textContent = t('ux.required');
+      meta.appendChild(required);
+    }
+    copy.appendChild(title);
+    copy.appendChild(meta);
+    const actions = document.createElement('div');
+    actions.className = 'ux-item-actions';
+    actions.appendChild(uxChecklistCreateIconButton('✎', 'ux.edit', () => { uxChecklistEditingId = item.id; uxChecklistRender(); }));
+    actions.appendChild(uxChecklistCreateIconButton('×', 'ux.delete', () => uxChecklistDelete(item.id)));
+    row.appendChild(check);
+    row.appendChild(copy);
+    row.appendChild(actions);
+    if (uxChecklistEditingId === item.id) uxChecklistRenderEdit(item, row);
+    list.appendChild(row);
+  });
+  document.getElementById('ux-empty').style.display = visible.length ? 'none' : 'block';
+}
+
+document.getElementById('ux-add').addEventListener('click', uxChecklistAdd);
+document.getElementById('ux-new-title').addEventListener('keydown', event => { if (event.key === 'Enter') uxChecklistAdd(); });
+document.querySelectorAll('.ux-filter').forEach(button => button.addEventListener('click', () => uxChecklistSetFilter(button.dataset.filter)));
+document.getElementById('ux-reset').addEventListener('click', () => {
+  if (!confirm(t('ux.resetConfirm'))) return;
+  uxChecklistItems = uxChecklistDefaultItems();
+  uxChecklistEditingId = '';
+  uxChecklistSave();
+  uxChecklistRender();
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════

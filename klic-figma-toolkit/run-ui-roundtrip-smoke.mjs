@@ -136,12 +136,14 @@ function createI18nHarness(script) {
     'menuRenderFilterTags',
     'menuUpdateCount',
     'tableRefreshDetected',
+    'uxChecklistRender',
     `${match[0]}
 return { I18N, t, applyLang, setLang, getLang: () => LANG };`,
   )(
     document,
     localStorage,
     { language: 'en-US' },
+    () => {},
     () => {},
     () => {},
     () => {},
