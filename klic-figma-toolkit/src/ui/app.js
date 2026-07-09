@@ -180,7 +180,8 @@ function commandEscape(value) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function commandSetText(id, value) {
@@ -248,15 +249,7 @@ function commandRunSmokeTest() {
 }
 
 async function commandOpenFolderMaker() {
-  try {
-    const res = await fetch(FOLDER_MAKER_BRIDGE_URL, { method: 'POST' });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.ok) throw new Error(data.error || 'Bridge returned an error');
-    commandRenderFolderMakerFallback(FOLDER_MAKER_BRIDGE_URL, t('command.folderMakerBridgeOpened'));
-    return;
-  } catch (err) {
-    commandRenderFolderMakerFallback(FOLDER_MAKER_BRIDGE_URL, t('command.folderMakerBridgeMissing'));
-  }
+  parent.postMessage({ pluginMessage: { type: 'command-open-folder-maker' } }, '*');
 }
 
 function commandTryOpenFolderMakerProtocol() {
@@ -627,6 +620,8 @@ let menuExcludeKeywords = [];
 let menuCsvData = null;
 let menuLevelCols = [];
 let menuSourceName = '';
+const MENU_MAX_SOURCE_BYTES = 2 * 1024 * 1024;
+const MENU_MAX_ITEMS = 500;
 
 const MENU_SAMPLE_CSV = `1차,2차,3차,4차,url,분류
 직무발명제도란?,한눈에 보는 직무발명제도,,,https://kipa.org/ip-job/intro/intro01.jsp,콘텐츠
@@ -734,7 +729,7 @@ function menuRenderDiagnostics(data) {
 }
 function menuRenderFilterTags() {
   document.getElementById('menu-filter-tags').innerHTML = menuExcludeKeywords.map((kw, i) =>
-    `<span class="filter-tag">${kw}<span class="remove" onclick="menuRemoveKeyword(${i})">×</span></span>`
+    `<span class="filter-tag">${commandEscape(kw)}<span class="remove" onclick="menuRemoveKeyword(${i})">×</span></span>`
   ).join('');
 }
 function menuAddKeyword() {
@@ -852,8 +847,8 @@ function parseMenuFromHTML(html) {
 }
 
 function menuApplyData(data) {
-  menuData = data;
-  menuRenderList(data);
+  menuData = data.slice(0, MENU_MAX_ITEMS);
+  menuRenderList(menuData);
   menuApplyKeywordFilter();
 }
 function menuRenderList(data) {
@@ -865,13 +860,13 @@ function menuRenderList(data) {
   });
   let html = '';
   for (const [sec, items] of Object.entries(sectionMap)) {
-    html += `<div class="menu-group-label">${sec}</div>`;
+    html += `<div class="menu-group-label">${commandEscape(sec)}</div>`;
     items.forEach(m => {
       html += `
         <label class="menu-item">
           <input type="checkbox" class="menu-item-check" data-index="${m.originalIndex}" checked onchange="menuUpdateCount()">
-          <span class="menu-name">${m.name}</span>
-          <span class="menu-path">${m.path}</span>
+          <span class="menu-name">${commandEscape(m.name)}</span>
+          <span class="menu-path">${commandEscape(m.path)}</span>
         </label>`;
     });
   }
@@ -923,7 +918,7 @@ function menuDetectLevelCols(headers) {
 function menuFillSelectOptions(id, headers, includeNone = false) {
   const sel = document.getElementById(id);
   sel.innerHTML = (includeNone ? '<option value="">--</option>' : '')
-    + headers.map(h => `<option value="${h}">${h}</option>`).join('');
+    + headers.map(h => `<option value="${commandEscape(h)}">${commandEscape(h)}</option>`).join('');
 }
 function menuRenderCatChips(rows, categoryCol) {
   const el = document.getElementById('menu-cat-chips');
@@ -933,9 +928,10 @@ function menuRenderCatChips(rows, categoryCol) {
   el.innerHTML = values.map(v => {
     const count = rows.filter(r => r[categoryCol] === v).length;
     const checked = defaultOn.some(d => v.toLowerCase().includes(d)) ? 'checked' : '';
+    const safeValue = commandEscape(v);
     return `<div class="cat-chip">
-      <input type="checkbox" id="menu-cat_${v}" value="${v}" ${checked}>
-      <label for="menu-cat_${v}">${v} (${count})</label>
+      <input type="checkbox" id="menu-cat_${safeValue}" value="${safeValue}" ${checked}>
+      <label for="menu-cat_${safeValue}">${safeValue} (${count})</label>
     </div>`;
   }).join('');
 }
@@ -996,6 +992,7 @@ function menuBuildFromCSV() {
 function menuApplyParsedCSV(parsed, fileName) {
   menuCsvData = parsed;
   if (!menuCsvData) { alert(t('menu.csvFail')); return false; }
+  menuCsvData.rows = menuCsvData.rows.slice(0, MENU_MAX_ITEMS);
   menuLevelCols = menuDetectLevelCols(menuCsvData.headers);
   menuFillSelectOptions('menu-name-col', menuCsvData.headers);
   menuFillSelectOptions('menu-path-col', menuCsvData.headers, true);
@@ -1009,6 +1006,10 @@ function menuApplyParsedCSV(parsed, fileName) {
   return true;
 }
 function menuLoadCSVFile(file) {
+  if (file.size > MENU_MAX_SOURCE_BYTES) {
+    menuSetStatus(t('menu.fetchFail'), 'error');
+    return;
+  }
   const encoding = document.getElementById('menu-encoding').value;
   const reader = new FileReader();
   reader.onload = (ev) => {
@@ -1032,8 +1033,14 @@ document.getElementById('menu-fetch').addEventListener('click', async () => {
   btn.disabled = true;
   menuSetStatus(t('menu.fetching'));
   try {
+    const parsedUrl = new URL(url);
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') throw new Error('Unsupported URL protocol');
     const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const declaredLength = Number(res.headers.get('content-length') || 0);
+    if (declaredLength > MENU_MAX_SOURCE_BYTES) throw new Error('Response too large');
     const html = await res.text();
+    if (html.length > MENU_MAX_SOURCE_BYTES) throw new Error('Response too large');
     const parsed = parseMenuFromHTML(html);
     if (parsed && parsed.length > 0) {
       menuSourceName = url;
@@ -1053,6 +1060,7 @@ document.getElementById('menu-fetch').addEventListener('click', async () => {
 document.getElementById('menu-parse').addEventListener('click', () => {
   const html = document.getElementById('menu-html-input').value.trim();
   if (!html) { menuSetHtmlStatus(t('menu.htmlEmpty'), 'error'); return; }
+  if (html.length > MENU_MAX_SOURCE_BYTES) { menuSetHtmlStatus(t('menu.fetchFail'), 'error'); return; }
   const parsed = parseMenuFromHTML(html);
   if (parsed && parsed.length > 0) {
     menuSourceName = 'html-source';
@@ -1390,7 +1398,7 @@ function styleRenderFontResults(families, cached) {
     return;
   }
   container.innerHTML = families.map(fam =>
-    `<div class="font-result-item${styleSelectedFont === fam ? ' active' : ''}" data-fam="${fam}">${fam}</div>`
+    `<div class="font-result-item${styleSelectedFont === fam ? ' active' : ''}" data-fam="${commandEscape(fam)}">${commandEscape(fam)}</div>`
   ).join('');
   container.querySelectorAll('.font-result-item[data-fam]').forEach(el => {
     el.addEventListener('click', () => styleApplyFont(el.dataset.fam));
@@ -2138,6 +2146,16 @@ function qaBytesToObjectUrl(bytes) {
   return URL.createObjectURL(blob);
 }
 
+let qaDesignObjectUrl = '';
+let qaImplObjectUrl = '';
+
+function qaReplaceObjectUrl(img, bytes, currentUrl) {
+  if (currentUrl) URL.revokeObjectURL(currentUrl);
+  const nextUrl = qaBytesToObjectUrl(bytes);
+  img.src = nextUrl;
+  return nextUrl;
+}
+
 function qaPlanImageScale(width, height) {
   const w = Math.max(1, Math.round(Number(width) || 1));
   const h = Math.max(1, Math.round(Number(height) || 1));
@@ -2165,7 +2183,7 @@ function qaCanvasToPngBytes(canvas) {
 
 function qaSetImplImage(bytes, width, height) {
   qaImpl = { bytes, width, height };
-  document.getElementById('qa-impl-img').src = qaBytesToObjectUrl(bytes);
+  qaImplObjectUrl = qaReplaceObjectUrl(document.getElementById('qa-impl-img'), bytes, qaImplObjectUrl);
   qaResetImplLabels();
   qaUpdateAgentNote();
 }
@@ -2458,7 +2476,9 @@ function qaLoadImplFile(file) {
   file.arrayBuffer().then((buf) => {
     const bytes = new Uint8Array(buf);
     const probe = new Image();
+    const probeUrl = qaBytesToObjectUrl(bytes);
     probe.onload = () => {
+      URL.revokeObjectURL(probeUrl);
       const plan = qaPlanImageScale(probe.naturalWidth, probe.naturalHeight);
       if (plan.factor === 1) {
         qaSetImplImage(bytes, plan.width, plan.height);
@@ -2477,9 +2497,10 @@ function qaLoadImplFile(file) {
       });
     };
     probe.onerror = () => {
+      URL.revokeObjectURL(probeUrl);
       document.getElementById('qa-result').textContent = t('designqa.errEncodeFailed');
     };
-    probe.src = qaBytesToObjectUrl(bytes);
+    probe.src = probeUrl;
   });
 }
 
@@ -2497,7 +2518,7 @@ function qaRenderRasterResult(msg) {
     return;
   }
   qaDesign = { bytes: msg.bytes, width: msg.width, height: msg.height, nodeId: msg.nodeId };
-  img.src = qaBytesToObjectUrl(msg.bytes);
+  qaDesignObjectUrl = qaReplaceObjectUrl(img, msg.bytes, qaDesignObjectUrl);
   hint.textContent = msg.width + ' × ' + msg.height;
   qaUpdateAgentNote();
 }

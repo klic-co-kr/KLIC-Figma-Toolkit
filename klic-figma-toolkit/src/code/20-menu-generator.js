@@ -160,7 +160,14 @@ async function updateTextIn(containerName, parent, newText) {
 }
 
 async function generatePages(menuData, meta) {
+  var createdNodes = [];
   try {
+    if (!Array.isArray(menuData) || menuData.length === 0) throw new Error('No menu data.');
+    if (menuData.length > 500) throw new Error('Menu generation is limited to 500 pages per run.');
+    menuData.forEach(function (item) {
+      if (!item || typeof item.name !== 'string' || typeof item.path !== 'string') throw new Error('Invalid menu item.');
+      if (item.name.length > 200 || item.path.length > 2000) throw new Error('Menu name or path is too long.');
+    });
     const templateInfo = await findMenuTemplate() || await createDefaultMenuTemplate();
 
     const template = templateInfo.template;
@@ -179,6 +186,7 @@ async function generatePages(menuData, meta) {
       const { name, path } = menuData[i];
 
       const clone = template.clone();
+      createdNodes.push(clone);
       clone.name = `sub_page_${name}`;
       tagKlicNode(clone, 'menu-page', Object.assign({
         source: 'menu-generator',
@@ -202,6 +210,9 @@ async function generatePages(menuData, meta) {
     figma.viewport.scrollAndZoomIntoView([template]);
     figma.ui.postMessage({ type: 'menu-done', count: menuData.length });
   } catch (err) {
+    createdNodes.reverse().forEach(function (node) {
+      if (node && typeof node.remove === 'function' && !node.removed) node.remove();
+    });
     figma.ui.postMessage({ type: 'menu-error', message: err.message || String(err) });
   }
 }

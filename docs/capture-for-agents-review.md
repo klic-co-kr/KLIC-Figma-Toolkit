@@ -7,9 +7,37 @@ Date: 2026-07-03
 - Requested URL: `https://github.com/JakeB-5/capture-for-agent`
 - Result: GitHub returned 404 for the singular repository name.
 - Reviewed source: `https://github.com/JakeB-5/capture-for-agents` (`Yeogiyo!!`)
-- Reviewed revision: `0de44d9 Merge pull request #3 from JakeB-5/feature/rename-yeogiyo`
+- Reviewed revision: `1500256 Merge pull request #5 from JakeB-5/feature/windows-port-plan`
+- Previous integration baseline: `0de44d9 Merge pull request #3 from JakeB-5/feature/rename-yeogiyo`
 - Local review clone: `/tmp/capture-for-agents`
 - License: MIT
+
+## 2026-07-03 Re-Review
+
+The public repository has advanced from the previous baseline `0de44d9` to
+`1500256`. The diff between those revisions touches project guidance,
+multi-monitor verification docs, and a Windows port plan:
+
+- `CLAUDE.md`
+- `HANDOFF.md`
+- `README.md`
+- `README.ko.md`
+- `docs/phase3-verification.md`
+- `docs/plan.html`
+- `docs/plan-windows.html`
+
+The CapNote/annotation implementation files that drove this integration did not
+change in that range:
+
+- `src/capnote.ts`
+- `src/downscale.ts`
+- `src/annotations.ts`
+- `src/annotator.ts`
+
+So the KLIC integration target remains the same portable subset: shared numbered
+point/rect/arrow annotations, final-image pixel coordinates, note text, and the
+1568px long-edge image policy. The new upstream Windows plan is desktop-shell
+scope and does not add a Figma-plugin requirement.
 
 ## What the Upstream Tool Does
 

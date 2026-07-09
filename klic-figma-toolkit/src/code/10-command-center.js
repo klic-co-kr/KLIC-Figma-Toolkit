@@ -1018,7 +1018,7 @@ async function commandPostSmokeEvidence(evidence) {
   if (typeof fetch !== 'function') throw new Error('fetch is not available in this Figma runtime.');
   var res = await fetch(KLIC_SMOKE_EVIDENCE_RECEIVER_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-KLIC-Client': KLIC_LOCAL_CLIENT_TOKEN },
     body: JSON.stringify(evidence),
   });
   if (!res || !res.ok) {
@@ -1030,9 +1030,14 @@ async function commandPostSmokeEvidence(evidence) {
 async function commandMaybeRunLocalSmokeEvidence() {
   if (typeof fetch !== 'function') return false;
   try {
-    var ready = await fetch(KLIC_SMOKE_EVIDENCE_RECEIVER_URL, { method: 'GET' });
+    var ready = await fetch(KLIC_SMOKE_EVIDENCE_RECEIVER_URL, {
+      method: 'GET',
+      headers: { 'X-KLIC-Client': KLIC_LOCAL_CLIENT_TOKEN },
+    });
     if (!ready || !ready.ok) return false;
-    await runCommandSmokeTest({ postToLocalhost: true });
+    var readyData = await ready.json();
+    if (!readyData || !/^[a-f0-9]{64}$/.test(readyData.challenge || '')) return false;
+    await runCommandSmokeTest({ postToLocalhost: true, receiverChallenge: readyData.challenge });
     return true;
   } catch (err) {
     return false;
@@ -1155,7 +1160,7 @@ async function runCommandSmokeTest(options) {
       kind: (figma.editorType === 'figma' && figma.apiVersion) ? 'figma-plugin' : 'mock-runtime',
       editorType: figma.editorType || 'mock',
       apiVersion: figma.apiVersion || 'mock',
-      pluginId: figma.pluginId || null,
+      pluginId: 'com.klic.figma-toolkit',
     };
 
     var preliminaryEvidence = {
@@ -1169,6 +1174,7 @@ async function runCommandSmokeTest(options) {
       variableId: variable.id,
       componentSetId: smokeComponentSet.id,
       componentInstanceId: componentInstance.id,
+      receiverChallenge: options.receiverChallenge || '',
       checks: smokeChecks,
     };
 

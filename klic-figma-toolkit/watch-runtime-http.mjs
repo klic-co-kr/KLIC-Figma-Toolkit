@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(root, '..');
 const receiverPath = '/klic-figma-smoke-evidence';
+const clientToken = '784d084535ea34a6d54538d37fcc26455e8854cb691f66b3ac368e6aeadfcc95';
 
 function printHelp() {
   console.log(`Usage:
@@ -82,13 +84,15 @@ function run(command, args, options = {}) {
   });
 }
 
-function validateAndSaveEvidence(evidence, targetPath) {
+function validateAndSaveEvidence(evidence, targetPath, challenge) {
   const tempPath = path.join(os.tmpdir(), `klic-runtime-http-evidence-${process.pid}.json`);
   fs.writeFileSync(tempPath, `${JSON.stringify(evidence, null, 2)}\n`);
   try {
     const validation = run('node', [
       'klic-figma-toolkit/validate-smoke-evidence.mjs',
       '--require-figma-runtime',
+      '--challenge',
+      challenge,
       tempPath,
     ]);
     if (validation.stdout) process.stdout.write(validation.stdout);
@@ -106,14 +110,15 @@ function validateAndSaveEvidence(evidence, targetPath) {
 function sendJson(res, status, payload) {
   res.writeHead(status, {
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-store',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, X-KLIC-Client',
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
   });
   res.end(JSON.stringify(payload));
 }
 
-function createSelfTestEvidence() {
+function createSelfTestEvidence(challenge) {
   const checkNames = [
     'Create local COLOR variable',
     'Create selectable test node',
@@ -143,15 +148,27 @@ function createSelfTestEvidence() {
     variableId: 'VariableID:10:22',
     componentSetId: '10:23',
     componentInstanceId: '10:24',
+    receiverChallenge: challenge,
     checks: checkNames.map((name) => ({ name, passed: true, detail: name })),
   };
 }
 
-async function postSelfTestEvidence(port, host) {
+async function postSelfTestEvidence(port, host, challenge) {
+  const unauthorized = await fetch(`http://${host}:${port}${receiverPath}`);
+  if (unauthorized.status !== 403) {
+    throw new Error(`HTTP receiver accepted an unauthenticated request with status ${unauthorized.status}.`);
+  }
+  const ready = await fetch(`http://${host}:${port}${receiverPath}`, {
+    headers: { 'X-KLIC-Client': clientToken },
+  });
+  const readyData = await ready.json();
+  if (!ready.ok || readyData.challenge !== challenge) {
+    throw new Error('HTTP receiver did not return its challenge to the authenticated client.');
+  }
   const res = await fetch(`http://${host}:${port}${receiverPath}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(createSelfTestEvidence()),
+    headers: { 'Content-Type': 'application/json', 'X-KLIC-Client': clientToken },
+    body: JSON.stringify(createSelfTestEvidence(challenge)),
   });
   if (!res.ok) {
     throw new Error(`HTTP self-test POST failed with status ${res.status}: ${await res.text()}`);
@@ -176,6 +193,8 @@ const done = new Promise((resolve) => {
   resolveDone = resolve;
 });
 let completed = false;
+const receiverChallenge = crypto.randomBytes(32).toString('hex');
+let challengeConsumed = false;
 
 function finish(result) {
   if (completed) return;
@@ -192,12 +211,20 @@ const server = http.createServer((req, res) => {
     sendJson(res, 404, { error: 'not_found' });
     return;
   }
+  if (req.headers['x-klic-client'] !== clientToken) {
+    sendJson(res, 403, { error: 'invalid_client' });
+    return;
+  }
   if (req.method === 'GET') {
-    sendJson(res, 200, { ready: true, receiver: 'klic-runtime-smoke-evidence' });
+    sendJson(res, 200, { ready: true, receiver: 'klic-runtime-smoke-evidence', challenge: receiverChallenge });
     return;
   }
   if (req.method !== 'POST') {
     sendJson(res, 405, { error: 'method_not_allowed' });
+    return;
+  }
+  if (challengeConsumed) {
+    sendJson(res, 409, { error: 'challenge_already_used' });
     return;
   }
 
@@ -215,7 +242,8 @@ const server = http.createServer((req, res) => {
   req.on('end', () => {
     try {
       const evidence = JSON.parse(body);
-      validateAndSaveEvidence(evidence, args.out);
+      validateAndSaveEvidence(evidence, args.out, receiverChallenge);
+      challengeConsumed = true;
       sendJson(res, 200, { saved: true, out: args.out });
       console.log(`Saved validated Figma smoke evidence: ${args.out}`);
       finish({ status: 0 });
@@ -252,7 +280,7 @@ const timeout = setTimeout(() => {
 }, args.timeoutMs);
 
 if (args.selfTest) {
-  postSelfTestEvidence(boundPort, args.host).catch((err) => {
+  postSelfTestEvidence(boundPort, args.host, receiverChallenge).catch((err) => {
     finish({ status: 1, message: err.message || String(err) });
   });
 }
@@ -283,6 +311,8 @@ if (!args.skipAudit) {
     'klic-figma-toolkit/run-completion-audit.mjs',
     '--runtime-evidence',
     args.out,
+    '--runtime-challenge',
+    receiverChallenge,
   ], { stdio: 'inherit' });
   process.exit(audit.status || 0);
 }

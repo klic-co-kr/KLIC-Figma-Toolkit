@@ -99,6 +99,7 @@ const styleTokenValidator = fs.readFileSync(styleTokenValidatorPath, 'utf8');
 const localVerification = fs.readFileSync(localVerificationPath, 'utf8');
 const styleGuideViewer = fs.readFileSync(styleGuideViewerPath, 'utf8');
 const folderMakerProtocolInstaller = fs.readFileSync(folderMakerProtocolInstallerPath, 'utf8');
+const folderMakerBridge = fs.readFileSync(folderMakerBridgePath, 'utf8');
 const readme = fs.readFileSync(path.join(root, '..', 'README.md'), 'utf8');
 const macRootLauncher = fs.readFileSync(macRootLauncherPath, 'utf8');
 
@@ -493,6 +494,8 @@ assert(runtimeEvidenceClipboardWatcher.includes('pbpaste'), 'clipboard watcher s
 assert(runtimeEvidenceClipboardWatcher.includes('wl-paste') && runtimeEvidenceClipboardWatcher.includes('xclip'), 'clipboard watcher should read Linux clipboards with wl-paste or xclip');
 assert(runtimeEvidenceHttpWatcher.includes('/klic-figma-smoke-evidence'), 'HTTP receiver should listen on the plugin smoke evidence endpoint');
 assert(runtimeEvidenceHttpWatcher.includes('--require-figma-runtime'), 'HTTP receiver should require real Figma runtime evidence');
+assert(runtimeEvidenceHttpWatcher.includes('receiverChallenge') && runtimeEvidenceHttpWatcher.includes('crypto.randomBytes'), 'HTTP receiver should bind evidence to a random one-time challenge');
+assert(runtimeEvidenceHttpWatcher.includes('X-KLIC-Client') && runtimeEvidenceHttpWatcher.includes('invalid_client'), 'HTTP receiver should require the local client capability before exposing its challenge');
 assert(runtimeEvidenceHttpWatcher.includes('createSelfTestEvidence') && runtimeEvidenceHttpWatcher.includes('--self-test'), 'HTTP receiver should provide a local self-test');
 assert(runtimeEvidenceHttpWatcher.includes('run-completion-audit.mjs') && runtimeEvidenceHttpWatcher.includes('--runtime-evidence'), 'HTTP receiver should run completion audit after saving evidence');
 assert(runtimeChecklist.includes('Style Guide font search performance'), 'runtime checklist should cover Style Guide font search performance');
@@ -576,7 +579,8 @@ assert(
 assert(code.includes("case 'command-open-folder-maker'") && code.includes('function openFolderMaker'), 'code.js is missing the Folder Maker launcher message handler');
 assert(!code.includes('figma.openExternal'), 'code.js must not use figma.openExternal for Folder Maker because Figma blocks the custom protocol');
 assert(ui.includes('FOLDER_MAKER_BRIDGE_URL') && ui.includes('http://localhost:39573/open-folder-maker'), 'ui.html is missing the local Folder Maker bridge URL');
-assert(ui.includes('fetch(FOLDER_MAKER_BRIDGE_URL') && ui.includes('commandRenderFolderMakerFallback'), 'ui.html is missing the Folder Maker bridge launcher and fallback');
+assert(!ui.includes('fetch(FOLDER_MAKER_BRIDGE_URL') && ui.includes("type: 'command-open-folder-maker'") && ui.includes('commandRenderFolderMakerFallback'), 'Folder Maker launch must go through the plugin backend and retain its fallback');
+assert(code.includes('X-KLIC-Bridge-Token') && code.includes("method: 'POST'"), 'Folder Maker backend launch must use the bridge session token and POST');
 assert(ui.includes('FOLDER_MAKER_BRIDGE_COMMAND') && ui.includes('folder-maker-bridge.cmd'), 'ui.html is missing Folder Maker bridge command fallback');
 assert(ui.includes('FOLDER_MAKER_GUI_COMMAND') && ui.includes('commandCopyFolderMakerCommand'), 'ui.html is missing Folder Maker GUI command copy fallback');
 assert(
@@ -585,6 +589,9 @@ assert(
   'Folder Maker protocol installer does not register the expected HKCU protocol',
 );
 assert(folderMakerProtocolInstaller.includes('folder-maker-gui.cmd'), 'Folder Maker protocol installer does not point to the GUI wrapper');
+assert(folderMakerBridge.includes("$request.HttpMethod -ne 'POST'") && folderMakerBridge.includes("X-KLIC-Bridge-Token"), 'Folder Maker bridge must require authenticated POST requests');
+assert(folderMakerBridge.includes("X-KLIC-Client") && folderMakerBridge.includes("INVALID_CLIENT"), 'Folder Maker bridge must require the local client capability before exposing its session token');
+assert(uiSource.includes('${commandEscape(m.name)}') && uiSource.includes('${commandEscape(m.path)}') && uiSource.includes('${commandEscape(sec)}'), 'menu rendering must escape imported HTML and CSV values');
 for (const smokeText of [
   'KLIC Smoke Test',
   'Runtime smoke test: ',

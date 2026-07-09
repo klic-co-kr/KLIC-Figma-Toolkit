@@ -7,11 +7,13 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(root, '..');
 
 function parseArgs(argv) {
-  const args = { runtimeEvidence: '', skipLocal: false };
+  const args = { runtimeEvidence: '', runtimeChallenge: '', skipLocal: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--runtime-evidence') {
       args.runtimeEvidence = argv[++i] || '';
+    } else if (arg === '--runtime-challenge') {
+      args.runtimeChallenge = argv[++i] || '';
     } else if (arg === '--skip-local') {
       args.skipLocal = true;
     } else if (arg === '--help' || arg === '-h') {
@@ -61,7 +63,7 @@ function printChecklist(checks) {
 
 function printHelp() {
   console.log(`Usage:
-  node klic-figma-toolkit/run-completion-audit.mjs --runtime-evidence path/to/smoke-evidence.json
+  node klic-figma-toolkit/run-completion-audit.mjs --runtime-evidence path/to/smoke-evidence.json --runtime-challenge <challenge>
 
 This is stricter than local preflight. It runs local verification and then validates
 the smoke evidence copied from the real Figma desktop runtime.
@@ -78,6 +80,7 @@ Then open the plugin in Figma desktop. If the Figma evidence JSON is on the clip
 
 Options:
   --runtime-evidence <path>  JSON copied from the Command Center runtime smoke test
+  --runtime-challenge <hex>  One-time challenge issued by the local HTTP receiver
   --skip-local              Skip local preflight rerun, for debugging only
 `);
 }
@@ -1189,6 +1192,8 @@ if (runtimeEvidencePath && fs.existsSync(runtimeEvidencePath)) {
   runtimeEvidenceResult = run('runtime smoke evidence validator', 'node', [
     'klic-figma-toolkit/validate-smoke-evidence.mjs',
     '--require-figma-runtime',
+    '--challenge',
+    args.runtimeChallenge,
     runtimeEvidencePath,
   ]);
   if (runtimeEvidenceResult.stdout) process.stdout.write(runtimeEvidenceResult.stdout);
@@ -1202,7 +1207,7 @@ add(
   args.runtimeEvidence
     ? `node klic-figma-toolkit/validate-smoke-evidence.mjs --require-figma-runtime ${args.runtimeEvidence}`
     : 'No --runtime-evidence path provided',
-  Boolean(runtimeEvidencePath && fs.existsSync(runtimeEvidencePath) && runtimeEvidenceResult?.status === 0),
+  Boolean(runtimeEvidencePath && fs.existsSync(runtimeEvidencePath) && args.runtimeChallenge && runtimeEvidenceResult?.status === 0),
   args.runtimeEvidence
     ? 'Runtime evidence file is missing or failed validation.'
     : 'Run ./KLIC-START.sh --runtime-acceptance. If Accessibility settings are already open, use ./KLIC-START.sh --wait-accessibility-runtime so the launcher continues as soon as permission is granted. The launcher starts HTTP/clipboard watchers and tries to open a new Figma design file through FigmaAgent. If FigmaAgent does not open a design file, open any Figma design file manually, then open the plugin in Figma desktop so it can POST smoke evidence. Or click Run smoke test, copy the evidence JSON, and run capture-runtime-evidence.cmd on Windows or ./klic-figma-toolkit/capture-runtime-evidence.sh on macOS/Linux. You can also pass the saved file with --runtime-evidence.',

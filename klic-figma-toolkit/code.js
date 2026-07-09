@@ -6,12 +6,13 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 var KLIC_RUNTIME_SMOKE_COMMAND = 'run-smoke-evidence';
+var KLIC_LOCAL_CLIENT_TOKEN = '784d084535ea34a6d54538d37fcc26455e8854cb691f66b3ac368e6aeadfcc95';
 
 figma.showUI(__html__, { width: 720, height: 820, title: 'KLIC Figma Toolkit' });
 
 if (figma.command === KLIC_RUNTIME_SMOKE_COMMAND) {
   setTimeout(function () {
-    runCommandSmokeTest({ postToLocalhost: true });
+    commandMaybeRunLocalSmokeEvidence();
   }, 0);
 } else {
   setTimeout(function () {
@@ -74,8 +75,28 @@ function resizePluginUi(size) {
   figma.ui.postMessage({ type: 'ui-resized', size: presets[size] ? size : 'default', width: next.width, height: next.height });
 }
 
-function openFolderMaker() {
-  figma.ui.postMessage({ type: 'command-folder-maker-fallback' });
+async function openFolderMaker() {
+  var baseUrl = 'http://127.0.0.1:39573';
+  try {
+    var health = await fetch(baseUrl + '/health', {
+      method: 'GET',
+      headers: { 'X-KLIC-Client': KLIC_LOCAL_CLIENT_TOKEN },
+    });
+    var healthData = await health.json();
+    if (!health.ok || !healthData.bridgeToken) throw new Error('Folder Maker bridge is not ready.');
+    var opened = await fetch(baseUrl + '/open-folder-maker', {
+      method: 'POST',
+      headers: {
+        'X-KLIC-Client': KLIC_LOCAL_CLIENT_TOKEN,
+        'X-KLIC-Bridge-Token': healthData.bridgeToken,
+      },
+    });
+    var openedData = await opened.json();
+    if (!opened.ok || !openedData.ok) throw new Error(openedData.error || 'Folder Maker bridge rejected the request.');
+    figma.ui.postMessage({ type: 'command-folder-maker-opened', url: baseUrl + '/open-folder-maker' });
+  } catch (err) {
+    figma.ui.postMessage({ type: 'command-folder-maker-fallback', message: err.message || String(err) });
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1098,7 +1119,7 @@ async function commandPostSmokeEvidence(evidence) {
   if (typeof fetch !== 'function') throw new Error('fetch is not available in this Figma runtime.');
   var res = await fetch(KLIC_SMOKE_EVIDENCE_RECEIVER_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-KLIC-Client': KLIC_LOCAL_CLIENT_TOKEN },
     body: JSON.stringify(evidence),
   });
   if (!res || !res.ok) {
@@ -1110,9 +1131,14 @@ async function commandPostSmokeEvidence(evidence) {
 async function commandMaybeRunLocalSmokeEvidence() {
   if (typeof fetch !== 'function') return false;
   try {
-    var ready = await fetch(KLIC_SMOKE_EVIDENCE_RECEIVER_URL, { method: 'GET' });
+    var ready = await fetch(KLIC_SMOKE_EVIDENCE_RECEIVER_URL, {
+      method: 'GET',
+      headers: { 'X-KLIC-Client': KLIC_LOCAL_CLIENT_TOKEN },
+    });
     if (!ready || !ready.ok) return false;
-    await runCommandSmokeTest({ postToLocalhost: true });
+    var readyData = await ready.json();
+    if (!readyData || !/^[a-f0-9]{64}$/.test(readyData.challenge || '')) return false;
+    await runCommandSmokeTest({ postToLocalhost: true, receiverChallenge: readyData.challenge });
     return true;
   } catch (err) {
     return false;
@@ -1235,7 +1261,7 @@ async function runCommandSmokeTest(options) {
       kind: (figma.editorType === 'figma' && figma.apiVersion) ? 'figma-plugin' : 'mock-runtime',
       editorType: figma.editorType || 'mock',
       apiVersion: figma.apiVersion || 'mock',
-      pluginId: figma.pluginId || null,
+      pluginId: 'com.klic.figma-toolkit',
     };
 
     var preliminaryEvidence = {
@@ -1249,6 +1275,7 @@ async function runCommandSmokeTest(options) {
       variableId: variable.id,
       componentSetId: smokeComponentSet.id,
       componentInstanceId: componentInstance.id,
+      receiverChallenge: options.receiverChallenge || '',
       checks: smokeChecks,
     };
 
@@ -1861,7 +1888,14 @@ async function updateTextIn(containerName, parent, newText) {
 }
 
 async function generatePages(menuData, meta) {
+  var createdNodes = [];
   try {
+    if (!Array.isArray(menuData) || menuData.length === 0) throw new Error('No menu data.');
+    if (menuData.length > 500) throw new Error('Menu generation is limited to 500 pages per run.');
+    menuData.forEach(function (item) {
+      if (!item || typeof item.name !== 'string' || typeof item.path !== 'string') throw new Error('Invalid menu item.');
+      if (item.name.length > 200 || item.path.length > 2000) throw new Error('Menu name or path is too long.');
+    });
     const templateInfo = await findMenuTemplate() || await createDefaultMenuTemplate();
 
     const template = templateInfo.template;
@@ -1880,6 +1914,7 @@ async function generatePages(menuData, meta) {
       const { name, path } = menuData[i];
 
       const clone = template.clone();
+      createdNodes.push(clone);
       clone.name = `sub_page_${name}`;
       tagKlicNode(clone, 'menu-page', Object.assign({
         source: 'menu-generator',
@@ -1903,6 +1938,9 @@ async function generatePages(menuData, meta) {
     figma.viewport.scrollAndZoomIntoView([template]);
     figma.ui.postMessage({ type: 'menu-done', count: menuData.length });
   } catch (err) {
+    createdNodes.reverse().forEach(function (node) {
+      if (node && typeof node.remove === 'function' && !node.removed) node.remove();
+    });
     figma.ui.postMessage({ type: 'menu-error', message: err.message || String(err) });
   }
 }
@@ -3346,6 +3384,7 @@ async function sendTableVariables() {
 
 async function generateTable(msg) {
   try {
+    if (!msg || typeof msg !== 'object') throw new Error('Invalid table request.');
     var fontReg = { family: 'Inter', style: 'Regular' };
     var fontBold = { family: 'Inter', style: 'Semi Bold' };
     try {
@@ -3377,11 +3416,23 @@ async function generateTable(msg) {
     var columnAlignments = Array.isArray(msg.columnAlignments) ? msg.columnAlignments : [];
 
     var allRows = headerRows.concat(bodyRows).concat(footerRows);
+    if (allRows.some(function (row) { return !Array.isArray(row); })) throw new Error('Invalid table row.');
     var numCols = allRows.reduce(function (m, r) { return Math.max(m, r.length); }, 0);
     if (numCols === 0) {
       figma.ui.postMessage({ type: 'table-error', message: 'No data.' });
       return;
     }
+    if (allRows.length > 500) throw new Error('Table generation is limited to 500 rows.');
+    if (numCols > 50) throw new Error('Table generation is limited to 50 columns.');
+    if (allRows.some(function (row) { return row.some(function (cell) { return String(cell == null ? '' : cell).length > 10000; }); })) {
+      throw new Error('Table cells are limited to 10,000 characters.');
+    }
+    paddingV = Math.max(0, Math.min(64, Number(paddingV) || 12));
+    paddingH = Math.max(0, Math.min(96, Number(paddingH) || 16));
+    minColW = Math.max(0, Math.min(1000, Number(minColW) || 0));
+    fontSize = Math.max(1, Math.min(256, Number(fontSize) || 18));
+    minRowH = Math.max(0, Math.min(2000, Number(minRowH) || 0));
+    tableWidth = Math.max(0, Math.min(100000, Number(tableWidth) || 0));
 
     async function makeColorFill(cfg, fallbackHex) {
       var hex = (cfg && cfg.hex && /^#[0-9a-fA-F]{6}$/.test(cfg.hex)) ? cfg.hex : fallbackHex;
@@ -3428,11 +3479,11 @@ async function generateTable(msg) {
     if (tableWidth > 0) {
       var totalRaw = rawWidths.reduce(function (a, b) { return a + b; }, 0) || 1;
       colWidths = rawWidths.map(function (w) {
-        return Math.max(minColW, Math.round(tableWidth * w / totalRaw));
+        return Math.max(paddingH * 2 + 1, minColW, Math.round(tableWidth * w / totalRaw));
       });
     } else {
       colWidths = rawWidths.map(function (w) {
-        return Math.min(320, Math.max(minColW, w));
+        return Math.max(paddingH * 2 + 1, Math.min(320, Math.max(minColW, w)));
       });
     }
 

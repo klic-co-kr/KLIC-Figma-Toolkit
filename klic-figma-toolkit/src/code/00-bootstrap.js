@@ -5,12 +5,13 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 var KLIC_RUNTIME_SMOKE_COMMAND = 'run-smoke-evidence';
+var KLIC_LOCAL_CLIENT_TOKEN = '784d084535ea34a6d54538d37fcc26455e8854cb691f66b3ac368e6aeadfcc95';
 
 figma.showUI(__html__, { width: 720, height: 820, title: 'KLIC Figma Toolkit' });
 
 if (figma.command === KLIC_RUNTIME_SMOKE_COMMAND) {
   setTimeout(function () {
-    runCommandSmokeTest({ postToLocalhost: true });
+    commandMaybeRunLocalSmokeEvidence();
   }, 0);
 } else {
   setTimeout(function () {
@@ -73,6 +74,26 @@ function resizePluginUi(size) {
   figma.ui.postMessage({ type: 'ui-resized', size: presets[size] ? size : 'default', width: next.width, height: next.height });
 }
 
-function openFolderMaker() {
-  figma.ui.postMessage({ type: 'command-folder-maker-fallback' });
+async function openFolderMaker() {
+  var baseUrl = 'http://127.0.0.1:39573';
+  try {
+    var health = await fetch(baseUrl + '/health', {
+      method: 'GET',
+      headers: { 'X-KLIC-Client': KLIC_LOCAL_CLIENT_TOKEN },
+    });
+    var healthData = await health.json();
+    if (!health.ok || !healthData.bridgeToken) throw new Error('Folder Maker bridge is not ready.');
+    var opened = await fetch(baseUrl + '/open-folder-maker', {
+      method: 'POST',
+      headers: {
+        'X-KLIC-Client': KLIC_LOCAL_CLIENT_TOKEN,
+        'X-KLIC-Bridge-Token': healthData.bridgeToken,
+      },
+    });
+    var openedData = await opened.json();
+    if (!opened.ok || !openedData.ok) throw new Error(openedData.error || 'Folder Maker bridge rejected the request.');
+    figma.ui.postMessage({ type: 'command-folder-maker-opened', url: baseUrl + '/open-folder-maker' });
+  } catch (err) {
+    figma.ui.postMessage({ type: 'command-folder-maker-fallback', message: err.message || String(err) });
+  }
 }

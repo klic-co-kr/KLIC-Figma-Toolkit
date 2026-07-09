@@ -22,8 +22,19 @@ function includesFixtureMarker(value) {
   return typeof value === 'string' && /\bfixture\b/i.test(value);
 }
 
-function readInput() {
-  const filePath = process.argv.find((arg, index) => index > 1 && !arg.startsWith('--'));
+function parseArgs(argv) {
+  const args = { filePath: '', requireFigmaRuntime: false, challenge: '' };
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--require-figma-runtime') args.requireFigmaRuntime = true;
+    else if (argv[i] === '--challenge') args.challenge = argv[++i] || '';
+    else if (argv[i].startsWith('--')) throw new Error(`Unknown argument: ${argv[i]}`);
+    else if (!args.filePath) args.filePath = argv[i];
+    else throw new Error(`Unexpected argument: ${argv[i]}`);
+  }
+  return args;
+}
+
+function readInput(filePath) {
   if (filePath) return fs.readFileSync(filePath, 'utf8');
   return fs.readFileSync(0, 'utf8');
 }
@@ -50,7 +61,13 @@ function validateEvidence(evidence, options = {}) {
   if (options.requireFigmaRuntime) {
     assert(evidence.runtime.kind === 'figma-plugin', `Smoke evidence is not from a real Figma plugin runtime: ${evidence.runtime.kind}.`);
     assert(evidence.runtime.editorType === 'figma', `Smoke evidence editorType is not figma: ${evidence.runtime.editorType}.`);
-    assert(evidence.runtime.apiVersion !== 'mock', 'Smoke evidence apiVersion indicates a mock runtime.');
+    assert(evidence.runtime.apiVersion === '1.0.0', `Smoke evidence apiVersion is invalid: ${evidence.runtime.apiVersion}.`);
+    assert(evidence.runtime.pluginId === 'com.klic.figma-toolkit', `Smoke evidence pluginId is invalid: ${evidence.runtime.pluginId}.`);
+    assert(/^\d+:\d+$/.test(evidence.nodeId), `Smoke evidence nodeId is invalid: ${evidence.nodeId}.`);
+    assert(/^\d+:\d+$/.test(evidence.reportNodeId), `Smoke evidence reportNodeId is invalid: ${evidence.reportNodeId}.`);
+    assert(/^VariableID:\d+:\d+$/.test(evidence.variableId), `Smoke evidence variableId is invalid: ${evidence.variableId}.`);
+    assert(/^\d+:\d+$/.test(evidence.componentSetId), `Smoke evidence componentSetId is invalid: ${evidence.componentSetId}.`);
+    assert(/^\d+:\d+$/.test(evidence.componentInstanceId), `Smoke evidence componentInstanceId is invalid: ${evidence.componentInstanceId}.`);
     assert(![
       evidence.nodeId,
       evidence.reportNodeId,
@@ -59,6 +76,12 @@ function validateEvidence(evidence, options = {}) {
       evidence.componentInstanceId,
     ].some(includesFixtureMarker), 'Smoke evidence contains fixture artifact ids.');
     assert(!evidence.checks.some((item) => includesFixtureMarker(item?.detail)), 'Smoke evidence contains fixture check details.');
+    assert(options.challenge && /^[a-f0-9]{64}$/.test(options.challenge), 'A valid receiver challenge is required for Figma runtime evidence.');
+    assert(evidence.receiverChallenge === options.challenge, 'Smoke evidence receiver challenge does not match this capture session.');
+    const generatedAt = Date.parse(evidence.generatedAt);
+    const ageMs = Date.now() - generatedAt;
+    assert(Number.isFinite(generatedAt), 'Smoke evidence generatedAt is not a valid timestamp.');
+    assert(ageMs >= -60 * 1000 && ageMs <= 15 * 60 * 1000, 'Smoke evidence is stale or dated in the future.');
   }
 
   for (const checkName of requiredChecks) {
@@ -81,9 +104,9 @@ function validateEvidence(evidence, options = {}) {
 }
 
 try {
-  const requireFigmaRuntime = process.argv.includes('--require-figma-runtime');
-  const evidence = JSON.parse(readInput());
-  const summary = validateEvidence(evidence, { requireFigmaRuntime });
+  const args = parseArgs(process.argv.slice(2));
+  const evidence = JSON.parse(readInput(args.filePath));
+  const summary = validateEvidence(evidence, { requireFigmaRuntime: args.requireFigmaRuntime, challenge: args.challenge });
   console.log('KLIC smoke evidence validation passed.');
   console.log(JSON.stringify(summary, null, 2));
 } catch (err) {

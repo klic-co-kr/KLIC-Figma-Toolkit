@@ -61,6 +61,7 @@ async function sendTableVariables() {
 
 async function generateTable(msg) {
   try {
+    if (!msg || typeof msg !== 'object') throw new Error('Invalid table request.');
     var fontReg = { family: 'Inter', style: 'Regular' };
     var fontBold = { family: 'Inter', style: 'Semi Bold' };
     try {
@@ -92,11 +93,23 @@ async function generateTable(msg) {
     var columnAlignments = Array.isArray(msg.columnAlignments) ? msg.columnAlignments : [];
 
     var allRows = headerRows.concat(bodyRows).concat(footerRows);
+    if (allRows.some(function (row) { return !Array.isArray(row); })) throw new Error('Invalid table row.');
     var numCols = allRows.reduce(function (m, r) { return Math.max(m, r.length); }, 0);
     if (numCols === 0) {
       figma.ui.postMessage({ type: 'table-error', message: 'No data.' });
       return;
     }
+    if (allRows.length > 500) throw new Error('Table generation is limited to 500 rows.');
+    if (numCols > 50) throw new Error('Table generation is limited to 50 columns.');
+    if (allRows.some(function (row) { return row.some(function (cell) { return String(cell == null ? '' : cell).length > 10000; }); })) {
+      throw new Error('Table cells are limited to 10,000 characters.');
+    }
+    paddingV = Math.max(0, Math.min(64, Number(paddingV) || 12));
+    paddingH = Math.max(0, Math.min(96, Number(paddingH) || 16));
+    minColW = Math.max(0, Math.min(1000, Number(minColW) || 0));
+    fontSize = Math.max(1, Math.min(256, Number(fontSize) || 18));
+    minRowH = Math.max(0, Math.min(2000, Number(minRowH) || 0));
+    tableWidth = Math.max(0, Math.min(100000, Number(tableWidth) || 0));
 
     async function makeColorFill(cfg, fallbackHex) {
       var hex = (cfg && cfg.hex && /^#[0-9a-fA-F]{6}$/.test(cfg.hex)) ? cfg.hex : fallbackHex;
@@ -143,11 +156,11 @@ async function generateTable(msg) {
     if (tableWidth > 0) {
       var totalRaw = rawWidths.reduce(function (a, b) { return a + b; }, 0) || 1;
       colWidths = rawWidths.map(function (w) {
-        return Math.max(minColW, Math.round(tableWidth * w / totalRaw));
+        return Math.max(paddingH * 2 + 1, minColW, Math.round(tableWidth * w / totalRaw));
       });
     } else {
       colWidths = rawWidths.map(function (w) {
-        return Math.min(320, Math.max(minColW, w));
+        return Math.max(paddingH * 2 + 1, Math.min(320, Math.max(minColW, w)));
       });
     }
 

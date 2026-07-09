@@ -38,8 +38,16 @@ class BaseNode {
   }
 
   resize(width, height) {
+    if (!(width >= 0) || !(height >= 0)) throw new Error('resize dimensions must be non-negative');
     this.width = width;
     this.height = height;
+  }
+
+  remove() {
+    if (this.parent && this.parent.children) {
+      this.parent.children = this.parent.children.filter((child) => child !== this);
+    }
+    this.removed = true;
   }
 
   exportAsync(settings) {
@@ -457,6 +465,34 @@ assert(generatedTableTexts.some((node) => node.characters === 'Ready' && node.te
 const generatedTableMeta = JSON.parse(generatedTable.getPluginData('klic.meta'));
 assert(generatedTableMeta.tableConfig?.preset === 'compact', 'table-generate should preserve preset metadata in pluginData');
 assert(generatedTableMeta.tableConfig?.columnAlignments?.join(',') === 'left,right,center', 'table-generate should preserve column alignment metadata in pluginData');
+
+const narrowTableStart = postedMessages.length;
+await figma.ui.onmessage({
+  type: 'table-generate',
+  headerRows: [Array.from({ length: 7 }, (_, i) => `H${i + 1}`)],
+  bodyRows: [Array.from({ length: 7 }, (_, i) => `C${i + 1}`)],
+  footerRows: [],
+  paddingV: 8,
+  paddingH: 48,
+  fontSize: 14,
+  tableWidth: 200,
+  colors: {},
+});
+const narrowTableMessages = postedMessages.slice(narrowTableStart);
+assert(narrowTableMessages.some((message) => message.type === 'table-done'), 'valid narrow table settings should not produce negative text widths');
+const narrowTable = page.children.filter((child) => child.name === 'Table').at(-1);
+assert(narrowTable.findAll((node) => node.type === 'TEXT').every((node) => node.width > 0), 'narrow table text widths should stay positive');
+
+const oversizedMenuStart = postedMessages.length;
+await figma.ui.onmessage({
+  type: 'menu-generate',
+  menuData: Array.from({ length: 501 }, (_, i) => ({ name: `Page ${i}`, path: `Root > Page ${i}` })),
+  meta: {},
+});
+assert(
+  postedMessages.slice(oversizedMenuStart).some((message) => message.type === 'menu-error' && message.message.includes('500')),
+  'menu generator should reject more than 500 pages',
+);
 
 const styleData = {
   brand: {
