@@ -4106,7 +4106,7 @@ window.onmessage = (event) => {
     if (msg.data && msg.data.previewItems) commandRenderBindingPreview(msg.data.previewItems);
     if (commandGuidedPhase === 'refresh') {
       commandGuidedSetPhase('bindings', 'command.guidedBindings');
-      parent.postMessage({ pluginMessage: { type: 'command-preview-color-bindings', scope: 'page', options: commandGetOptions() } }, '*');
+      parent.postMessage({ pluginMessage: { type: 'command-preview-color-bindings', scope: 'page', options: commandGetOptions(), requestId: commandGuidedRequestId } }, '*');
     }
     return;
   }
