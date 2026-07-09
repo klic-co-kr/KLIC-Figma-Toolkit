@@ -174,7 +174,7 @@ check_accessibility_permission() {
   if granted="$(accessibility_granted_client)"; then
     echo "Accessibility permission: granted for $granted"
   else
-    echo "Accessibility permission: not detected for Ghostty/Terminal/iTerm2"
+    echo "Accessibility permission: not detected for Ghostty/cmux/Terminal/iTerm2"
     local apple_events_clients=""
     apple_events_clients="$(apple_events_any_clients || true)"
     if [[ -n "$apple_events_clients" ]]; then
@@ -222,7 +222,7 @@ accessibility_controller_hint() {
         return 0
         ;;
       *"/Applications/cmux.app/"*)
-        echo "cmux.app first; if menu automation is still blocked, also allow the terminal app hosting this session"
+        echo "cmux.app (com.cmuxterm.app)"
         return 0
         ;;
     esac
@@ -268,7 +268,7 @@ accessibility_granted_client() {
     return 1
   fi
   local granted=""
-  granted="$(sqlite3 "$tcc_db" "select client from access where service = 'kTCCServiceAccessibility' and auth_value = 2 and client in ('com.mitchellh.ghostty','com.apple.Terminal','com.googlecode.iterm2') limit 1;" 2>/dev/null || true)"
+  granted="$(sqlite3 "$tcc_db" "select client from access where service = 'kTCCServiceAccessibility' and auth_value = 2 and client in ('com.mitchellh.ghostty','com.cmuxterm.app','com.apple.Terminal','com.googlecode.iterm2') limit 1;" 2>/dev/null || true)"
   if [[ -n "$granted" ]]; then
     echo "$granted"
     return 0
