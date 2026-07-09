@@ -930,7 +930,7 @@ add(
     'command.folderMakerOpened',
     'FOLDER_MAKER_BRIDGE_URL',
     'http://localhost:39573/open-folder-maker',
-    'fetch(FOLDER_MAKER_BRIDGE_URL',
+    "type: 'command-open-folder-maker'",
     'FOLDER_MAKER_BRIDGE_COMMAND',
     'folder-maker-bridge.cmd',
   ])
@@ -938,6 +938,7 @@ add(
       "case 'command-open-folder-maker'",
       'function openFolderMaker',
       'command-folder-maker-fallback',
+      'X-KLIC-Bridge-Token',
     ])
     && !code.includes('figma.openExternal')
     && hasAll(verifier, [
