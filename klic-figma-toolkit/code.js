@@ -1307,6 +1307,7 @@ async function runCommandSmokeTest(options) {
       variableId: variable.id,
       componentSetId: smokeComponentSet.id,
       componentInstanceId: componentInstance.id,
+      receiverChallenge: options.receiverChallenge || '',
       checks: smokeChecks,
     };
     tagKlicNode(report, 'runtime-smoke-report', {
