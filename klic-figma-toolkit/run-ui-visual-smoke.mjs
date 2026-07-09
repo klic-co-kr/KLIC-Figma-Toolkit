@@ -227,6 +227,18 @@ async function run() {
           commandScope = 'selection';
           commandGuidedStart();
           checks.commandScopeAfterGuidedStart = commandScope;
+          const guidedId = commandGuidedRequestId;
+          window.onmessage({ data: { pluginMessage: { type: 'command-snapshot', requestId: 'stale-refresh', data: {} } } });
+          checks.staleSnapshotIgnored = commandGuidedPhase === 'refresh' && commandGuidedRequestId === guidedId;
+          commandGuidedSetPhase('fixes', 'command.guidedFixes');
+          fixSessionRequestId = guidedId;
+          window.onmessage({ data: { pluginMessage: { type: 'command-fixes-preview', requestId: 'stale-fixes', counts: { A: 1 }, items: [] } } });
+          checks.staleFixesIgnored = commandGuidedPhase === 'fixes';
+          commandGuidedSetPhase('idle', 'command.guidedReady');
+          qaActiveRequestId = 'qa-current';
+          document.getElementById('qa-result-list').innerHTML = '<div id="qa-stale-marker">unchanged</div>';
+          window.onmessage({ data: { pluginMessage: { type: 'command-component-qa-result', requestId: 'qa-stale', summary: {}, issues: [] } } });
+          checks.staleQaIgnored = !!document.getElementById('qa-stale-marker');
           checks.uxChecklistCount = document.querySelectorAll('#ux-checklist-list .ux-check-item').length;
           checks.uxChecklistOverflow = [...document.querySelectorAll('.ux-checklist-panel input, .ux-checklist-panel select, .ux-checklist-panel button')]
             .some((el) => el.scrollWidth > el.clientWidth + 1);
@@ -251,6 +263,9 @@ async function run() {
     assert(workspaceValue.qaDefaultScopeStatus.includes('Selection'), `QA should display its active scope, got ${workspaceValue.qaDefaultScopeStatus}`);
     assert(workspaceValue.qaPageScope === 'page' && workspaceValue.qaPageButtonActive === true, 'QA page scope toggle should update independent QA state');
     assert(workspaceValue.commandScopeAfterGuidedStart === 'selection', 'Guided Workflow must not mutate the manual Command Center scope');
+    assert(workspaceValue.staleSnapshotIgnored === true, 'Guided Workflow must ignore a stale refresh response');
+    assert(workspaceValue.staleFixesIgnored === true, 'Guided Workflow must ignore a stale fix preview');
+    assert(workspaceValue.staleQaIgnored === true, 'QA must ignore a result from an older request');
     assert(workspaceValue.uxChecklistCount === 13, `QA pane should render 13 KLIC checklist defaults, got ${workspaceValue.uxChecklistCount}`);
     assert(workspaceValue.uxChecklistOverflow === false, 'UI/UX checklist controls should not overflow their containers');
     assert(workspaceValue.handoffPane === 'pane-handoff', `Handoff tool tab should activate pane-handoff, got ${workspaceValue.handoffPane}`);
@@ -265,6 +280,7 @@ async function run() {
       expression: `
         (() => {
           switchTool('qa');
+          uxChecklistSetDocumentKey('visual-smoke-file');
           const initial = uxChecklistItems.length;
           document.getElementById('ux-new-title').value = 'CRUD smoke item';
           document.getElementById('ux-new-category').value = 'interaction';
@@ -286,7 +302,7 @@ async function run() {
             afterDelete: uxChecklistItems.length,
             updatedTitle: updated?.title || '',
             completed,
-            stored: !!localStorage.getItem('klic.uxChecklist.v1'),
+            stored: !!localStorage.getItem('klic.uxChecklist.v2.visual-smoke-file'),
           };
         })()
       `,

@@ -6,6 +6,7 @@
 
 var commandFixProviders = {};
 var commandFixQueue = [];
+var commandFixQueueRequestId = '';
 
 function commandRegisterFixProvider(id, tier, applyFn) {
   commandFixProviders[id] = { tier: tier, apply: applyFn };
@@ -23,22 +24,28 @@ function commandFixCounts(queue) {
 
 async function commandCollectFixes(msg) {
   try {
-    commandFixQueue = [];
+    commandFixQueueRequestId = msg.requestId || '';
+    var requestId = commandFixQueueRequestId;
+    var nextQueue = [];
     var scope = msg.scope || 'selection';
     var options = msg.options || {};
     var snapshot = await collectCommandSnapshot(scope, options);
+    if (requestId !== commandFixQueueRequestId) return;
     var nodes = commandLastScanNodes;
     var colorVariables = await commandGetLocalColorVariables();
-    commandGatherFixDescriptors(snapshot, nodes, colorVariables, commandFixQueue);
+    if (requestId !== commandFixQueueRequestId) return;
+    commandGatherFixDescriptors(snapshot, nodes, colorVariables, nextQueue);
+    commandFixQueue = nextQueue;
     figma.ui.postMessage({
       type: 'command-fixes-preview',
-      counts: commandFixCounts(commandFixQueue),
-      items: commandFixQueue.map(function (item) {
+      requestId: requestId,
+      counts: commandFixCounts(nextQueue),
+      items: nextQueue.map(function (item) {
         return { id: item.id, providerId: item.providerId, tier: item.tier, label: item.label, preview: item.preview };
       }),
     });
   } catch (err) {
-    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err) });
+    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err), requestId: msg.requestId || '' });
   }
 }
 
@@ -226,6 +233,7 @@ async function commandApplyFixes(msg) {
   var skipped = 0;
   var attempted = false;
   try {
+    if ((msg.requestId || '') !== commandFixQueueRequestId) throw new Error('Fix preview is stale. Scan again before applying.');
     var targets = [];
     if (msg.tier === 'AB') {
       targets = commandFixQueue.filter(function (item) { return item.tier === 'A' || item.tier === 'B'; });
@@ -242,9 +250,9 @@ async function commandApplyFixes(msg) {
       var ok = await provider.apply(item.payload);
       if (ok) applied++; else skipped++;
     }
-    figma.ui.postMessage({ type: 'command-fixes-applied', applied: applied, skipped: skipped, tier: msg.tier || 'items' });
+    figma.ui.postMessage({ type: 'command-fixes-applied', applied: applied, skipped: skipped, tier: msg.tier || 'items', requestId: commandFixQueueRequestId });
   } catch (err) {
-    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err) });
+    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err), requestId: msg.requestId || '' });
   } finally {
     if (attempted) figma.commitUndo();
   }

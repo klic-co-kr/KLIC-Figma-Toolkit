@@ -17,6 +17,16 @@ function safeStorageSet(key, value) {
   }
 }
 
+function safeStorageRemove(key) {
+  try {
+    const storage = (typeof window !== 'undefined' && window.localStorage)
+      || (typeof localStorage !== 'undefined' && localStorage);
+    if (storage) storage.removeItem(key);
+  } catch (err) {
+    // Ignore unavailable iframe storage.
+  }
+}
+
 const UI_SIZE_PRESETS = {
   compact: { width: 560, height: 720 },
   default: { width: 720, height: 820 },
@@ -95,6 +105,11 @@ let commandScope = 'selection';
 let qaScope = 'selection';
 let qaActiveScope = '';
 let fixSessionScope = 'selection';
+let commandRequestSeq = 0;
+let commandGuidedRequestId = '';
+let commandActiveRequestId = '';
+let qaActiveRequestId = '';
+let fixSessionRequestId = '';
 let commandPreviewItems = [];
 let commandLastSnapshot = null;
 let commandLastPreviewItems = [];
@@ -102,6 +117,11 @@ const FOLDER_MAKER_PROTOCOL_URL = 'klic-folder-maker://open';
 const FOLDER_MAKER_BRIDGE_URL = 'http://localhost:39573/open-folder-maker';
 const FOLDER_MAKER_BRIDGE_COMMAND = 'D:\\DEV\\KLIC-Figma\\folder-maker\\folder-maker-bridge.cmd';
 const FOLDER_MAKER_GUI_COMMAND = 'D:\\DEV\\KLIC-Figma\\folder-maker\\folder-maker-gui.cmd';
+
+function commandNextRequestId(prefix) {
+  commandRequestSeq++;
+  return `${prefix}-${Date.now().toString(36)}-${commandRequestSeq}`;
+}
 
 function commandGetOptions() {
   return {
@@ -211,28 +231,33 @@ function commandGetBindingList(mode) {
 
 function commandRefresh(scope) {
   commandScope = scope || commandScope;
-  parent.postMessage({ pluginMessage: { type: 'command-refresh', scope: commandScope, options: commandGetOptions() } }, '*');
+  commandActiveRequestId = commandNextRequestId('refresh');
+  parent.postMessage({ pluginMessage: { type: 'command-refresh', scope: commandScope, options: commandGetOptions(), requestId: commandActiveRequestId } }, '*');
 }
 
 function commandPreviewBindings() {
-  parent.postMessage({ pluginMessage: { type: 'command-preview-color-bindings', scope: commandScope, options: commandGetOptions() } }, '*');
+  commandActiveRequestId = commandNextRequestId('bindings');
+  parent.postMessage({ pluginMessage: { type: 'command-preview-color-bindings', scope: commandScope, options: commandGetOptions(), requestId: commandActiveRequestId } }, '*');
 }
 
 function commandApplyBindings() {
   const selected = [...document.querySelectorAll('.command-binding-check:checked')]
     .map(input => commandPreviewItems[parseInt(input.dataset.index)])
     .filter(Boolean);
-  parent.postMessage({ pluginMessage: { type: 'command-apply-color-bindings', scope: commandScope, changes: selected, options: commandGetOptions() } }, '*');
+  commandActiveRequestId = commandNextRequestId('apply-bindings');
+  parent.postMessage({ pluginMessage: { type: 'command-apply-color-bindings', scope: commandScope, changes: selected, options: commandGetOptions(), requestId: commandActiveRequestId } }, '*');
 }
 
 function commandRunKwcagKrdsAudit() {
   qaBeginRun(qaScope);
-  parent.postMessage({ pluginMessage: { type: 'command-kwcag-krds-audit', scope: qaActiveScope, options: commandGetOptions() } }, '*');
+  qaActiveRequestId = commandNextRequestId('kwcag');
+  parent.postMessage({ pluginMessage: { type: 'command-kwcag-krds-audit', scope: qaActiveScope, options: commandGetOptions(), requestId: qaActiveRequestId } }, '*');
 }
 
 function commandRunComponentQa() {
   qaBeginRun(qaScope);
-  parent.postMessage({ pluginMessage: { type: 'command-component-qa', scope: qaActiveScope, options: commandGetOptions() } }, '*');
+  qaActiveRequestId = commandNextRequestId('component-qa');
+  parent.postMessage({ pluginMessage: { type: 'command-component-qa', scope: qaActiveScope, options: commandGetOptions(), requestId: qaActiveRequestId } }, '*');
 }
 
 function qaScopeLabel(scope) {
@@ -598,20 +623,22 @@ function commandGuidedSetPhase(phase, statusKey) {
 function commandGuidedCollectFixes() {
   commandGuidedSetPhase('fixes', 'command.guidedFixes');
   fixSessionScope = 'page';
-  parent.postMessage({ pluginMessage: { type: 'command-collect-fixes', scope: fixSessionScope, options: commandGetOptions() } }, '*');
+  fixSessionRequestId = commandGuidedRequestId;
+  parent.postMessage({ pluginMessage: { type: 'command-collect-fixes', scope: fixSessionScope, options: commandGetOptions(), requestId: commandGuidedRequestId } }, '*');
 }
 
 function commandGuidedRunAudit() {
   commandGuidedSetPhase('kwcag', 'command.guidedKwcag');
-  parent.postMessage({ pluginMessage: { type: 'command-kwcag-krds-audit', scope: 'page', options: commandGetOptions() } }, '*');
+  parent.postMessage({ pluginMessage: { type: 'command-kwcag-krds-audit', scope: 'page', options: commandGetOptions(), requestId: commandGuidedRequestId } }, '*');
 }
 
 function commandGuidedStart() {
   switchTool('command');
+  commandGuidedRequestId = commandNextRequestId('guided');
   const includeOklch = document.getElementById('command-include-oklch-apply');
   if (includeOklch) includeOklch.checked = false;
   commandGuidedSetPhase('refresh', 'command.guidedRefreshing');
-  parent.postMessage({ pluginMessage: { type: 'command-refresh', scope: 'page', options: commandGetOptions() } }, '*');
+  parent.postMessage({ pluginMessage: { type: 'command-refresh', scope: 'page', options: commandGetOptions(), requestId: commandGuidedRequestId } }, '*');
 }
 
 function commandGuidedOpenTool(tool) {
@@ -661,10 +688,11 @@ document.querySelectorAll('.guided-step[data-tool]').forEach(step => {
    other Command Center result uses (no separate setStatus helper exists). */
 document.getElementById('fix-scan').addEventListener('click', function () {
   fixSessionScope = commandScope;
-  parent.postMessage({ pluginMessage: { type: 'command-collect-fixes', scope: fixSessionScope, options: commandGetOptions() } }, '*');
+  fixSessionRequestId = commandNextRequestId('fixes');
+  parent.postMessage({ pluginMessage: { type: 'command-collect-fixes', scope: fixSessionScope, options: commandGetOptions(), requestId: fixSessionRequestId } }, '*');
 });
 document.getElementById('fix-batch-apply').addEventListener('click', function () {
-  parent.postMessage({ pluginMessage: { type: 'command-apply-fixes', tier: 'AB' } }, '*');
+  parent.postMessage({ pluginMessage: { type: 'command-apply-fixes', tier: 'AB', requestId: fixSessionRequestId } }, '*');
 });
 
 function commandRenderFixPreview(msg) {
@@ -693,7 +721,7 @@ function commandRenderFixPreview(msg) {
     btn.className = 'btn';
     btn.textContent = t('command.fixApplyItem');
     btn.addEventListener('click', function () {
-      parent.postMessage({ pluginMessage: { type: 'command-apply-fixes', ids: [it.id] } }, '*');
+      parent.postMessage({ pluginMessage: { type: 'command-apply-fixes', ids: [it.id], requestId: fixSessionRequestId } }, '*');
     });
     li.appendChild(label);
     li.appendChild(btn);
@@ -2049,7 +2077,9 @@ document.getElementById('table-generate').addEventListener('click', () => {
 /* ═══════════════════════════════════════════════════════════════════════════
    MODULE: KLIC UI/UX CHECKLIST
    ═══════════════════════════════════════════════════════════════════════════ */
-const UX_CHECKLIST_STORAGE_KEY = 'klic.uxChecklist.v1';
+const UX_CHECKLIST_STORAGE_PREFIX = 'klic.uxChecklist.v2.';
+const UX_CHECKLIST_LEGACY_KEY = 'klic.uxChecklist.v1';
+let uxChecklistStorageKey = '';
 const UX_CHECKLIST_CATEGORIES = ['accessibility', 'design-system', 'responsive', 'interaction', 'content', 'handoff'];
 const UX_CHECKLIST_DEFAULTS = [
   ['ux.default.contrast', 'accessibility', true],
@@ -2078,7 +2108,7 @@ function uxChecklistDefaultItems() {
 }
 
 function uxChecklistLoad() {
-  const raw = safeStorageGet(UX_CHECKLIST_STORAGE_KEY);
+  const raw = uxChecklistStorageKey ? safeStorageGet(uxChecklistStorageKey) : null;
   if (!raw) return uxChecklistDefaultItems();
   try {
     const parsed = JSON.parse(raw);
@@ -2093,8 +2123,24 @@ let uxChecklistItems = uxChecklistLoad();
 let uxChecklistFilter = 'all';
 let uxChecklistEditingId = '';
 
+function uxChecklistSetDocumentKey(documentKey) {
+  const normalized = String(documentKey || 'untitled').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 160);
+  uxChecklistStorageKey = UX_CHECKLIST_STORAGE_PREFIX + normalized;
+  let raw = safeStorageGet(uxChecklistStorageKey);
+  if (!raw) {
+    const legacy = safeStorageGet(UX_CHECKLIST_LEGACY_KEY);
+    if (legacy) {
+      safeStorageSet(uxChecklistStorageKey, legacy);
+      safeStorageRemove(UX_CHECKLIST_LEGACY_KEY);
+    }
+  }
+  uxChecklistItems = uxChecklistLoad();
+  uxChecklistEditingId = '';
+  uxChecklistRender();
+}
+
 function uxChecklistSave() {
-  safeStorageSet(UX_CHECKLIST_STORAGE_KEY, JSON.stringify(uxChecklistItems));
+  if (uxChecklistStorageKey) safeStorageSet(uxChecklistStorageKey, JSON.stringify(uxChecklistItems));
 }
 
 function uxChecklistTitle(item) {
@@ -2287,6 +2333,10 @@ window.onmessage = (event) => {
     applyUiSizeState();
     return;
   }
+  if (msg.type === 'ui-context') {
+    uxChecklistSetDocumentKey(msg.documentKey);
+    return;
+  }
 
   /* ── Command Center ── */
   if (msg.type === 'command-progress') {
@@ -2295,6 +2345,8 @@ window.onmessage = (event) => {
     return;
   }
   if (msg.type === 'command-snapshot') {
+    if (commandGuidedPhase === 'refresh' && msg.requestId !== commandGuidedRequestId) return;
+    if (commandGuidedPhase !== 'refresh' && msg.requestId && commandActiveRequestId && msg.requestId !== commandActiveRequestId && msg.requestId !== commandGuidedRequestId) return;
     commandRenderSnapshot(msg.data);
     if (msg.data && msg.data.previewItems) commandRenderBindingPreview(msg.data.previewItems);
     if (commandGuidedPhase === 'refresh') {
@@ -2304,12 +2356,13 @@ window.onmessage = (event) => {
     return;
   }
   if (msg.type === 'command-fixes-preview') {
+    if (msg.requestId !== fixSessionRequestId) return;
     commandRenderFixPreview(msg);
     if (commandGuidedPhase === 'fixes') {
       const counts = msg.counts || {};
       if ((counts.A || 0) + (counts.B || 0) > 0) {
         commandGuidedSetPhase('apply-fixes', 'command.guidedApplyingFixes');
-        parent.postMessage({ pluginMessage: { type: 'command-apply-fixes', tier: 'AB' } }, '*');
+        parent.postMessage({ pluginMessage: { type: 'command-apply-fixes', tier: 'AB', requestId: commandGuidedRequestId } }, '*');
       } else {
         commandGuidedRunAudit();
       }
@@ -2317,14 +2370,17 @@ window.onmessage = (event) => {
     return;
   }
   if (msg.type === 'command-fixes-applied') {
+    if (msg.requestId !== fixSessionRequestId) return;
     const list = commandGetBindingList();
     list.innerHTML = `<div class="hint">${t('command.fixApplied', msg.applied || 0)}</div>`;
     if (commandGuidedPhase === 'apply-fixes') commandGuidedRunAudit();
     // Re-scan so counts/chips reflect the post-apply state (mirrors command-refresh).
-    parent.postMessage({ pluginMessage: { type: 'command-collect-fixes', scope: fixSessionScope, options: commandGetOptions() } }, '*');
+    parent.postMessage({ pluginMessage: { type: 'command-collect-fixes', scope: fixSessionScope, options: commandGetOptions(), requestId: fixSessionRequestId } }, '*');
     return;
   }
   if (msg.type === 'command-bindings-preview') {
+    if (commandGuidedPhase === 'bindings' && msg.requestId !== commandGuidedRequestId) return;
+    if (commandGuidedPhase !== 'bindings' && msg.requestId && commandActiveRequestId && msg.requestId !== commandActiveRequestId) return;
     commandRenderSnapshot(msg.data);
     commandRenderBindingPreview(msg.items || []);
     if (commandGuidedPhase === 'bindings') {
@@ -2333,7 +2389,7 @@ window.onmessage = (event) => {
         commandGuidedSetPhase('apply-bindings', 'command.guidedApplyingBindings');
         const options = commandGetOptions();
         options.includeOklchApply = false;
-        parent.postMessage({ pluginMessage: { type: 'command-apply-color-bindings', scope: 'page', changes: exact, options } }, '*');
+        parent.postMessage({ pluginMessage: { type: 'command-apply-color-bindings', scope: 'page', changes: exact, options, requestId: commandGuidedRequestId } }, '*');
       } else {
         commandGuidedCollectFixes();
       }
@@ -2341,21 +2397,27 @@ window.onmessage = (event) => {
     return;
   }
   if (msg.type === 'command-apply-result') {
+    if (commandGuidedPhase === 'apply-bindings' && msg.requestId !== commandGuidedRequestId) return;
+    if (commandGuidedPhase !== 'apply-bindings' && msg.requestId && commandActiveRequestId && msg.requestId !== commandActiveRequestId) return;
     const list = commandGetBindingList('binding');
     list.innerHTML = `<div class="hint">${t('command.applied', msg.applied || 0, msg.skipped || 0)}</div>`;
     if (commandGuidedPhase === 'apply-bindings') commandGuidedCollectFixes();
     return;
   }
   if (msg.type === 'command-kwcag-krds-audit-result') {
+    if (commandGuidedPhase === 'kwcag' && msg.requestId !== commandGuidedRequestId) return;
+    if (commandGuidedPhase !== 'kwcag' && msg.requestId !== qaActiveRequestId) return;
     if (commandGuidedPhase !== 'kwcag') qaRenderScopeStatus(qaActiveScope || qaScope);
     commandRenderKwcagKrdsAudit(msg);
     if (commandGuidedPhase === 'kwcag') {
       commandGuidedSetPhase('component-qa', 'command.guidedComponentQa');
-      parent.postMessage({ pluginMessage: { type: 'command-component-qa', scope: 'page', options: commandGetOptions() } }, '*');
+      parent.postMessage({ pluginMessage: { type: 'command-component-qa', scope: 'page', options: commandGetOptions(), requestId: commandGuidedRequestId } }, '*');
     }
     return;
   }
   if (msg.type === 'command-component-qa-result') {
+    if (commandGuidedPhase === 'component-qa' && msg.requestId !== commandGuidedRequestId) return;
+    if (commandGuidedPhase !== 'component-qa' && msg.requestId !== qaActiveRequestId) return;
     if (commandGuidedPhase !== 'component-qa') qaRenderScopeStatus(qaActiveScope || qaScope);
     commandRenderComponentQa(msg);
     if (commandGuidedPhase === 'component-qa') commandGuidedSetPhase('done', 'command.guidedComplete');
@@ -2392,6 +2454,7 @@ window.onmessage = (event) => {
     return;
   }
   if (msg.type === 'command-error') {
+    if (msg.requestId && commandGuidedPhase !== 'idle' && commandGuidedPhase !== 'done' && msg.requestId !== commandGuidedRequestId) return;
     const list = commandGetBindingList();
     list.innerHTML = `<div class="status error">${commandEscape(t('command.error', msg.message || 'Unknown error'))}</div>`;
     commandGuidedFail();
@@ -2958,3 +3021,4 @@ document.getElementById('qa-copy-note').addEventListener('click', () => {
 });
 qaInitOverlay();
 qaUpdateAgentNote();
+parent.postMessage({ pluginMessage: { type: 'ui-ready' } }, '*');

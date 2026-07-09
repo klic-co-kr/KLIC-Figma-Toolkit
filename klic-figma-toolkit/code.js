@@ -24,6 +24,7 @@ figma.ui.onmessage = async function (msg) {
   if (!msg || !msg.type) return;
 
   switch (msg.type) {
+    case 'ui-ready': return sendUiContext();
     case 'ui-resize': return resizePluginUi(msg.size);
 
     /* ── Command Center ── */
@@ -63,6 +64,10 @@ figma.ui.onmessage = async function (msg) {
     case 'cancel':            return figma.closePlugin();
   }
 };
+
+function sendUiContext() {
+  figma.ui.postMessage({ type: 'ui-context', documentKey: figma.fileKey || ('local-' + (figma.root && figma.root.name || 'untitled')) });
+}
 
 function resizePluginUi(size) {
   var presets = {
@@ -679,18 +684,18 @@ async function collectCommandSnapshot(scope, options) {
 async function refreshCommandCenter(msg) {
   try {
     var snapshot = await collectCommandSnapshot(msg.scope || 'selection', msg.options || {});
-    figma.ui.postMessage({ type: 'command-snapshot', data: snapshot });
+    figma.ui.postMessage({ type: 'command-snapshot', data: snapshot, requestId: msg.requestId || '' });
   } catch (err) {
-    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err) });
+    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err), requestId: msg.requestId || '' });
   }
 }
 
 async function previewColorBindings(msg) {
   try {
     var snapshot = await collectCommandSnapshot(msg.scope || 'selection', msg.options || {});
-    figma.ui.postMessage({ type: 'command-bindings-preview', items: snapshot.previewItems, data: snapshot });
+    figma.ui.postMessage({ type: 'command-bindings-preview', items: snapshot.previewItems, data: snapshot, requestId: msg.requestId || '' });
   } catch (err) {
-    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err) });
+    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err), requestId: msg.requestId || '' });
   }
 }
 
@@ -779,6 +784,7 @@ async function runKwcagKrdsAudit(msg) {
     });
     figma.ui.postMessage({
       type: 'command-kwcag-krds-audit-result',
+      requestId: (msg && msg.requestId) || '',
       summary: {
         standard: 'KWCAG 2.2 + KRDS',
         scope: (msg && msg.scope) || 'selection',
@@ -792,7 +798,7 @@ async function runKwcagKrdsAudit(msg) {
       issues: issues.slice(0, 100),
     });
   } catch (err) {
-    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err) });
+    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err), requestId: (msg && msg.requestId) || '' });
   }
 }
 
@@ -877,6 +883,7 @@ async function runComponentQa(msg) {
     });
     figma.ui.postMessage({
       type: 'command-component-qa-result',
+      requestId: (msg && msg.requestId) || '',
       summary: {
         standard: 'KLIC Component QA',
         scope: (msg && msg.scope) || 'selection',
@@ -889,7 +896,7 @@ async function runComponentQa(msg) {
       issues: issues.slice(0, 100),
     });
   } catch (err) {
-    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err) });
+    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err), requestId: (msg && msg.requestId) || '' });
   }
 }
 
@@ -937,7 +944,7 @@ async function runTokenGovernance() {
       issues: issues.slice(0, 100),
     });
   } catch (err) {
-    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err) });
+    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err), requestId: msg.requestId || '' });
   }
 }
 
@@ -984,8 +991,8 @@ async function applyColorBindings(msg) {
       node[change.property] = nextPaints;
       applied++;
     }
-    figma.ui.postMessage({ type: 'command-apply-result', applied: applied, skipped: skipped });
-    await refreshCommandCenter({ scope: msg.scope || 'selection', options: msg.options || {} });
+    figma.ui.postMessage({ type: 'command-apply-result', applied: applied, skipped: skipped, requestId: msg.requestId || '' });
+    await refreshCommandCenter({ scope: msg.scope || 'selection', options: msg.options || {}, requestId: msg.requestId || '' });
   } catch (err) {
     figma.ui.postMessage({ type: 'command-error', message: err.message || String(err) });
   }
@@ -1266,7 +1273,7 @@ async function runCommandSmokeTest(options) {
       kind: (figma.editorType === 'figma' && figma.apiVersion) ? 'figma-plugin' : 'mock-runtime',
       editorType: figma.editorType || 'mock',
       apiVersion: figma.apiVersion || 'mock',
-      pluginId: 'com.klic.figma-toolkit',
+      pluginId: figma.pluginId || null,
     };
 
     var preliminaryEvidence = {
@@ -1358,6 +1365,7 @@ async function runCommandSmokeTest(options) {
 
 var commandFixProviders = {};
 var commandFixQueue = [];
+var commandFixQueueRequestId = '';
 
 function commandRegisterFixProvider(id, tier, applyFn) {
   commandFixProviders[id] = { tier: tier, apply: applyFn };
@@ -1375,22 +1383,28 @@ function commandFixCounts(queue) {
 
 async function commandCollectFixes(msg) {
   try {
-    commandFixQueue = [];
+    commandFixQueueRequestId = msg.requestId || '';
+    var requestId = commandFixQueueRequestId;
+    var nextQueue = [];
     var scope = msg.scope || 'selection';
     var options = msg.options || {};
     var snapshot = await collectCommandSnapshot(scope, options);
+    if (requestId !== commandFixQueueRequestId) return;
     var nodes = commandLastScanNodes;
     var colorVariables = await commandGetLocalColorVariables();
-    commandGatherFixDescriptors(snapshot, nodes, colorVariables, commandFixQueue);
+    if (requestId !== commandFixQueueRequestId) return;
+    commandGatherFixDescriptors(snapshot, nodes, colorVariables, nextQueue);
+    commandFixQueue = nextQueue;
     figma.ui.postMessage({
       type: 'command-fixes-preview',
-      counts: commandFixCounts(commandFixQueue),
-      items: commandFixQueue.map(function (item) {
+      requestId: requestId,
+      counts: commandFixCounts(nextQueue),
+      items: nextQueue.map(function (item) {
         return { id: item.id, providerId: item.providerId, tier: item.tier, label: item.label, preview: item.preview };
       }),
     });
   } catch (err) {
-    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err) });
+    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err), requestId: msg.requestId || '' });
   }
 }
 
@@ -1578,6 +1592,7 @@ async function commandApplyFixes(msg) {
   var skipped = 0;
   var attempted = false;
   try {
+    if ((msg.requestId || '') !== commandFixQueueRequestId) throw new Error('Fix preview is stale. Scan again before applying.');
     var targets = [];
     if (msg.tier === 'AB') {
       targets = commandFixQueue.filter(function (item) { return item.tier === 'A' || item.tier === 'B'; });
@@ -1594,9 +1609,9 @@ async function commandApplyFixes(msg) {
       var ok = await provider.apply(item.payload);
       if (ok) applied++; else skipped++;
     }
-    figma.ui.postMessage({ type: 'command-fixes-applied', applied: applied, skipped: skipped, tier: msg.tier || 'items' });
+    figma.ui.postMessage({ type: 'command-fixes-applied', applied: applied, skipped: skipped, tier: msg.tier || 'items', requestId: commandFixQueueRequestId });
   } catch (err) {
-    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err) });
+    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err), requestId: msg.requestId || '' });
   } finally {
     if (attempted) figma.commitUndo();
   }

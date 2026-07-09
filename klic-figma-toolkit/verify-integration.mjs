@@ -130,7 +130,7 @@ assert(
     && ui.includes('function uxChecklistRender')
     && ui.includes('function uxChecklistSaveEdit')
     && ui.includes('function uxChecklistDelete')
-    && ui.includes('klic.uxChecklist.v1'),
+    && ui.includes('klic.uxChecklist.v2.'),
   'QA pane must provide persistent CRUD operations for the KLIC UI/UX checklist',
 );
 assert(

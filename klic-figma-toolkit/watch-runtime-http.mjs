@@ -111,9 +111,6 @@ function sendJson(res, status, payload) {
   res.writeHead(status, {
     'Content-Type': 'application/json',
     'Cache-Control': 'no-store',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, X-KLIC-Client',
-    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
   });
   res.end(JSON.stringify(payload));
 }
@@ -204,7 +201,7 @@ function finish(result) {
 
 const server = http.createServer((req, res) => {
   if (req.method === 'OPTIONS') {
-    sendJson(res, 204, {});
+    sendJson(res, 403, { error: 'browser_origin_not_allowed' });
     return;
   }
   if (req.url !== receiverPath) {

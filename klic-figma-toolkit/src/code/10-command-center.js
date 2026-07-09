@@ -578,18 +578,18 @@ async function collectCommandSnapshot(scope, options) {
 async function refreshCommandCenter(msg) {
   try {
     var snapshot = await collectCommandSnapshot(msg.scope || 'selection', msg.options || {});
-    figma.ui.postMessage({ type: 'command-snapshot', data: snapshot });
+    figma.ui.postMessage({ type: 'command-snapshot', data: snapshot, requestId: msg.requestId || '' });
   } catch (err) {
-    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err) });
+    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err), requestId: msg.requestId || '' });
   }
 }
 
 async function previewColorBindings(msg) {
   try {
     var snapshot = await collectCommandSnapshot(msg.scope || 'selection', msg.options || {});
-    figma.ui.postMessage({ type: 'command-bindings-preview', items: snapshot.previewItems, data: snapshot });
+    figma.ui.postMessage({ type: 'command-bindings-preview', items: snapshot.previewItems, data: snapshot, requestId: msg.requestId || '' });
   } catch (err) {
-    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err) });
+    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err), requestId: msg.requestId || '' });
   }
 }
 
@@ -678,6 +678,7 @@ async function runKwcagKrdsAudit(msg) {
     });
     figma.ui.postMessage({
       type: 'command-kwcag-krds-audit-result',
+      requestId: (msg && msg.requestId) || '',
       summary: {
         standard: 'KWCAG 2.2 + KRDS',
         scope: (msg && msg.scope) || 'selection',
@@ -691,7 +692,7 @@ async function runKwcagKrdsAudit(msg) {
       issues: issues.slice(0, 100),
     });
   } catch (err) {
-    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err) });
+    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err), requestId: (msg && msg.requestId) || '' });
   }
 }
 
@@ -776,6 +777,7 @@ async function runComponentQa(msg) {
     });
     figma.ui.postMessage({
       type: 'command-component-qa-result',
+      requestId: (msg && msg.requestId) || '',
       summary: {
         standard: 'KLIC Component QA',
         scope: (msg && msg.scope) || 'selection',
@@ -788,7 +790,7 @@ async function runComponentQa(msg) {
       issues: issues.slice(0, 100),
     });
   } catch (err) {
-    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err) });
+    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err), requestId: (msg && msg.requestId) || '' });
   }
 }
 
@@ -836,7 +838,7 @@ async function runTokenGovernance() {
       issues: issues.slice(0, 100),
     });
   } catch (err) {
-    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err) });
+    figma.ui.postMessage({ type: 'command-error', message: err.message || String(err), requestId: msg.requestId || '' });
   }
 }
 
@@ -883,8 +885,8 @@ async function applyColorBindings(msg) {
       node[change.property] = nextPaints;
       applied++;
     }
-    figma.ui.postMessage({ type: 'command-apply-result', applied: applied, skipped: skipped });
-    await refreshCommandCenter({ scope: msg.scope || 'selection', options: msg.options || {} });
+    figma.ui.postMessage({ type: 'command-apply-result', applied: applied, skipped: skipped, requestId: msg.requestId || '' });
+    await refreshCommandCenter({ scope: msg.scope || 'selection', options: msg.options || {}, requestId: msg.requestId || '' });
   } catch (err) {
     figma.ui.postMessage({ type: 'command-error', message: err.message || String(err) });
   }
@@ -1165,7 +1167,7 @@ async function runCommandSmokeTest(options) {
       kind: (figma.editorType === 'figma' && figma.apiVersion) ? 'figma-plugin' : 'mock-runtime',
       editorType: figma.editorType || 'mock',
       apiVersion: figma.apiVersion || 'mock',
-      pluginId: 'com.klic.figma-toolkit',
+      pluginId: figma.pluginId || null,
     };
 
     var preliminaryEvidence = {

@@ -23,6 +23,7 @@ figma.ui.onmessage = async function (msg) {
   if (!msg || !msg.type) return;
 
   switch (msg.type) {
+    case 'ui-ready': return sendUiContext();
     case 'ui-resize': return resizePluginUi(msg.size);
 
     /* ── Command Center ── */
@@ -62,6 +63,10 @@ figma.ui.onmessage = async function (msg) {
     case 'cancel':            return figma.closePlugin();
   }
 };
+
+function sendUiContext() {
+  figma.ui.postMessage({ type: 'ui-context', documentKey: figma.fileKey || ('local-' + (figma.root && figma.root.name || 'untitled')) });
+}
 
 function resizePluginUi(size) {
   var presets = {
