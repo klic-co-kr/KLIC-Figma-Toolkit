@@ -1114,6 +1114,7 @@ async function createCommandReportBoard(msg) {
 }
 
 var KLIC_SMOKE_EVIDENCE_RECEIVER_URL = 'http://127.0.0.1:51337/klic-figma-smoke-evidence';
+var KLIC_LOCAL_SMOKE_IN_FLIGHT = false;
 
 async function commandPostSmokeEvidence(evidence) {
   if (typeof fetch !== 'function') throw new Error('fetch is not available in this Figma runtime.');
@@ -1129,7 +1130,9 @@ async function commandPostSmokeEvidence(evidence) {
 }
 
 async function commandMaybeRunLocalSmokeEvidence() {
+  if (KLIC_LOCAL_SMOKE_IN_FLIGHT) return false;
   if (typeof fetch !== 'function') return false;
+  KLIC_LOCAL_SMOKE_IN_FLIGHT = true;
   try {
     var ready = await fetch(KLIC_SMOKE_EVIDENCE_RECEIVER_URL, {
       method: 'GET',
@@ -1142,6 +1145,8 @@ async function commandMaybeRunLocalSmokeEvidence() {
     return true;
   } catch (err) {
     return false;
+  } finally {
+    KLIC_LOCAL_SMOKE_IN_FLIGHT = false;
   }
 }
 
