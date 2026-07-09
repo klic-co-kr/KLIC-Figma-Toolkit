@@ -50,6 +50,7 @@ function applyLang() {
   menuUpdateCount();
   tableRefreshDetected();
   uxChecklistRender();
+  if (typeof qaRenderScopeStatus === 'function') qaRenderScopeStatus(qaActiveScope || qaScope);
 }
 function setLang(l) {
   LANG = I18N[l] ? l : 'en';
@@ -91,6 +92,9 @@ function switchTool(tool) {
    MODULE: COMMAND CENTER
    ═══════════════════════════════════════════════════════════════════════════ */
 let commandScope = 'selection';
+let qaScope = 'selection';
+let qaActiveScope = '';
+let fixSessionScope = 'selection';
 let commandPreviewItems = [];
 let commandLastSnapshot = null;
 let commandLastPreviewItems = [];
@@ -222,11 +226,37 @@ function commandApplyBindings() {
 }
 
 function commandRunKwcagKrdsAudit() {
-  parent.postMessage({ pluginMessage: { type: 'command-kwcag-krds-audit', scope: commandScope, options: commandGetOptions() } }, '*');
+  qaBeginRun(qaScope);
+  parent.postMessage({ pluginMessage: { type: 'command-kwcag-krds-audit', scope: qaActiveScope, options: commandGetOptions() } }, '*');
 }
 
 function commandRunComponentQa() {
-  parent.postMessage({ pluginMessage: { type: 'command-component-qa', scope: commandScope, options: commandGetOptions() } }, '*');
+  qaBeginRun(qaScope);
+  parent.postMessage({ pluginMessage: { type: 'command-component-qa', scope: qaActiveScope, options: commandGetOptions() } }, '*');
+}
+
+function qaScopeLabel(scope) {
+  return t(scope === 'page' ? 'qa.scopePage' : 'qa.scopeSelection');
+}
+
+function qaRenderScopeStatus(scope) {
+  const status = document.getElementById('qa-scope-status');
+  if (status) status.textContent = t('qa.scopeActive', qaScopeLabel(scope));
+}
+
+function qaSetScope(scope) {
+  qaScope = scope === 'page' ? 'page' : 'selection';
+  document.querySelectorAll('.qa-scope-btn').forEach(button => {
+    const active = button.dataset.scope === qaScope;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+  qaRenderScopeStatus(qaScope);
+}
+
+function qaBeginRun(scope) {
+  qaActiveScope = scope === 'page' ? 'page' : 'selection';
+  qaRenderScopeStatus(qaActiveScope);
 }
 
 function commandRunTokenGovernance() {
@@ -567,7 +597,8 @@ function commandGuidedSetPhase(phase, statusKey) {
 
 function commandGuidedCollectFixes() {
   commandGuidedSetPhase('fixes', 'command.guidedFixes');
-  parent.postMessage({ pluginMessage: { type: 'command-collect-fixes', scope: 'page', options: commandGetOptions() } }, '*');
+  fixSessionScope = 'page';
+  parent.postMessage({ pluginMessage: { type: 'command-collect-fixes', scope: fixSessionScope, options: commandGetOptions() } }, '*');
 }
 
 function commandGuidedRunAudit() {
@@ -577,7 +608,6 @@ function commandGuidedRunAudit() {
 
 function commandGuidedStart() {
   switchTool('command');
-  commandScope = 'page';
   const includeOklch = document.getElementById('command-include-oklch-apply');
   if (includeOklch) includeOklch.checked = false;
   commandGuidedSetPhase('refresh', 'command.guidedRefreshing');
@@ -612,6 +642,10 @@ document.getElementById('command-create-report-board').addEventListener('click',
 document.getElementById('command-open-folder-maker').addEventListener('click', commandOpenFolderMaker);
 document.getElementById('command-project-type').addEventListener('change', (event) => commandApplyProjectPreset(event.target.value));
 document.getElementById('command-guided-run').addEventListener('click', commandGuidedStart);
+document.querySelectorAll('.qa-scope-btn').forEach(button => {
+  button.addEventListener('click', () => qaSetScope(button.dataset.scope));
+});
+qaSetScope('selection');
 document.querySelectorAll('.guided-step[data-tool]').forEach(step => {
   step.addEventListener('click', () => {
     const tool = step.dataset.tool;
@@ -626,7 +660,8 @@ document.querySelectorAll('.guided-step[data-tool]').forEach(step => {
    Status feedback flows through commandGetBindingList() — same surface every
    other Command Center result uses (no separate setStatus helper exists). */
 document.getElementById('fix-scan').addEventListener('click', function () {
-  parent.postMessage({ pluginMessage: { type: 'command-collect-fixes', scope: commandScope, options: commandGetOptions() } }, '*');
+  fixSessionScope = commandScope;
+  parent.postMessage({ pluginMessage: { type: 'command-collect-fixes', scope: fixSessionScope, options: commandGetOptions() } }, '*');
 });
 document.getElementById('fix-batch-apply').addEventListener('click', function () {
   parent.postMessage({ pluginMessage: { type: 'command-apply-fixes', tier: 'AB' } }, '*');
@@ -2286,7 +2321,7 @@ window.onmessage = (event) => {
     list.innerHTML = `<div class="hint">${t('command.fixApplied', msg.applied || 0)}</div>`;
     if (commandGuidedPhase === 'apply-fixes') commandGuidedRunAudit();
     // Re-scan so counts/chips reflect the post-apply state (mirrors command-refresh).
-    parent.postMessage({ pluginMessage: { type: 'command-collect-fixes', scope: commandScope, options: commandGetOptions() } }, '*');
+    parent.postMessage({ pluginMessage: { type: 'command-collect-fixes', scope: fixSessionScope, options: commandGetOptions() } }, '*');
     return;
   }
   if (msg.type === 'command-bindings-preview') {
@@ -2312,6 +2347,7 @@ window.onmessage = (event) => {
     return;
   }
   if (msg.type === 'command-kwcag-krds-audit-result') {
+    if (commandGuidedPhase !== 'kwcag') qaRenderScopeStatus(qaActiveScope || qaScope);
     commandRenderKwcagKrdsAudit(msg);
     if (commandGuidedPhase === 'kwcag') {
       commandGuidedSetPhase('component-qa', 'command.guidedComponentQa');
@@ -2320,6 +2356,7 @@ window.onmessage = (event) => {
     return;
   }
   if (msg.type === 'command-component-qa-result') {
+    if (commandGuidedPhase !== 'component-qa') qaRenderScopeStatus(qaActiveScope || qaScope);
     commandRenderComponentQa(msg);
     if (commandGuidedPhase === 'component-qa') commandGuidedSetPhase('done', 'command.guidedComplete');
     return;

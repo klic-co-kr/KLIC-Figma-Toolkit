@@ -219,6 +219,14 @@ async function run() {
           checks.qaPane = document.querySelector('.tool-pane.active')?.id || '';
           checks.qaActions = [...document.querySelectorAll('#pane-qa button')].map((el) => el.id).filter(Boolean);
           checks.qaResultList = !!document.getElementById('qa-result-list');
+          checks.qaDefaultScope = qaScope;
+          checks.qaDefaultScopeStatus = document.getElementById('qa-scope-status')?.textContent.trim() || '';
+          qaSetScope('page');
+          checks.qaPageScope = qaScope;
+          checks.qaPageButtonActive = document.querySelector('.qa-scope-btn[data-scope="page"]')?.classList.contains('active') || false;
+          commandScope = 'selection';
+          commandGuidedStart();
+          checks.commandScopeAfterGuidedStart = commandScope;
           checks.uxChecklistCount = document.querySelectorAll('#ux-checklist-list .ux-check-item').length;
           checks.uxChecklistOverflow = [...document.querySelectorAll('.ux-checklist-panel input, .ux-checklist-panel select, .ux-checklist-panel button')]
             .some((el) => el.scrollWidth > el.clientWidth + 1);
@@ -239,6 +247,10 @@ async function run() {
     assert(workspaceValue.qaActions.includes('command-component-qa'), 'QA pane should expose Component QA');
     assert(workspaceValue.qaActions.includes('command-token-governance'), 'QA pane should expose Token Governance');
     assert(workspaceValue.qaResultList === true, 'QA pane should include qa-result-list');
+    assert(workspaceValue.qaDefaultScope === 'selection', `QA should default to selection scope, got ${workspaceValue.qaDefaultScope}`);
+    assert(workspaceValue.qaDefaultScopeStatus.includes('Selection'), `QA should display its active scope, got ${workspaceValue.qaDefaultScopeStatus}`);
+    assert(workspaceValue.qaPageScope === 'page' && workspaceValue.qaPageButtonActive === true, 'QA page scope toggle should update independent QA state');
+    assert(workspaceValue.commandScopeAfterGuidedStart === 'selection', 'Guided Workflow must not mutate the manual Command Center scope');
     assert(workspaceValue.uxChecklistCount === 13, `QA pane should render 13 KLIC checklist defaults, got ${workspaceValue.uxChecklistCount}`);
     assert(workspaceValue.uxChecklistOverflow === false, 'UI/UX checklist controls should not overflow their containers');
     assert(workspaceValue.handoffPane === 'pane-handoff', `Handoff tool tab should activate pane-handoff, got ${workspaceValue.handoffPane}`);

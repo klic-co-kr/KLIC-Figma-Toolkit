@@ -503,6 +503,13 @@
     <div class="workspace-panel">
       <div class="workspace-options">
         <label><span data-i18n="command.scanLimit">Scan limit</span><input type="number" id="command-scan-limit" value="2000" min="50" max="10000"></label>
+        <div class="qa-scope-control">
+          <span data-i18n="qa.scope">Diagnostic scope</span>
+          <div class="qa-scope-toggle" role="group" data-i18n-aria="qa.scope">
+            <button class="qa-scope-btn active" type="button" data-scope="selection" data-i18n="qa.scopeSelection">Selection</button>
+            <button class="qa-scope-btn" type="button" data-scope="page" data-i18n="qa.scopePage">Current page</button>
+          </div>
+        </div>
       </div>
       <div class="workspace-actions">
         <button class="btn" id="command-kwcag-krds-audit" data-i18n="command.kwcagKrdsAudit">KWCAG/KRDS audit</button>
@@ -510,6 +517,7 @@
         <button class="btn" id="command-token-governance" data-i18n="command.tokenGovernance">Token governance</button>
         <button class="btn" id="command-cancel-scan" data-i18n="command.cancelScan">Cancel scan</button>
       </div>
+      <div class="qa-scope-status" id="qa-scope-status" aria-live="polite"></div>
       <div class="binding-list" id="qa-result-list"></div>
     </div>
   </div>
