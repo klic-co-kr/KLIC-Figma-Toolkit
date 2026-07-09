@@ -188,6 +188,8 @@ async function run() {
             stepTitles: steps.map((step) => step.querySelector('.pipeline-step-title')?.textContent.trim() || ''),
             guidedStepCount: guidedSteps.length,
             guidedOverflow: guidedSteps.some((step) => step.scrollWidth > step.clientWidth + 1 || step.scrollHeight > step.clientHeight + 1),
+            commandSideOverflow: [...document.querySelectorAll('.command-side .btn, .command-side .side-chip, .command-side h3')]
+              .some((el) => el.scrollWidth > el.clientWidth + 1),
             problems,
             pipelineRect: rect(document.getElementById('command-pipeline')),
           };
@@ -202,6 +204,7 @@ async function run() {
     assert(commandValue.stepCount === 4, `Project Pipeline should render 4 steps, got ${commandValue.stepCount}`);
     assert(commandValue.guidedStepCount === 5, `Guided Workflow should render 5 tool steps, got ${commandValue.guidedStepCount}`);
     assert(commandValue.guidedOverflow === false, 'Guided Workflow controls should not overflow their containers');
+    assert(commandValue.commandSideOverflow === false, 'Command Center side controls should not overflow their containers');
     for (const title of ['Setup', 'Generate', 'QA', 'Handoff']) {
       assert(commandValue.stepTitles.includes(title), `Project Pipeline is missing ${title}`);
     }
