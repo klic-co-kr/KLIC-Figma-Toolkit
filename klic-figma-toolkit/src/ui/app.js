@@ -409,6 +409,7 @@ function commandRenderDynamicI18n() {
   commandRenderProjectPipeline();
   if (commandLastSnapshot) commandRenderSnapshot(commandLastSnapshot);
   if (commandLastPreviewItems && commandLastPreviewItems.length) commandRenderBindingPreview(commandLastPreviewItems);
+  commandGuidedRender();
 }
 
 async function commandCopySmokeEvidence(button) {
@@ -528,6 +529,74 @@ function commandRenderSmokeChecks(msg) {
   return `<div class="${msg.passed ? 'hint' : 'status error'}">${msg.passed ? t('command.smokePassed') : commandEscape(t('command.smokeFailed', msg.message))}</div>${rows ? `<div class="command-issues" style="margin-top:8px">${rows}</div>` : ''}${evidence}`;
 }
 
+let commandGuidedPhase = 'idle';
+let commandGuidedStatusKey = 'command.guidedReady';
+
+function commandGuidedRender() {
+  const button = document.getElementById('command-guided-run');
+  if (button) button.textContent = t(commandGuidedPhase === 'done' ? 'command.guidedRerun' : 'command.guidedRun');
+  if (commandGuidedPhase !== 'idle') {
+    const status = document.querySelector('#guided-step-command .guided-status');
+    if (status) status.textContent = t(commandGuidedStatusKey);
+  }
+}
+
+function commandGuidedSetStep(tool, state, statusKey) {
+  const step = document.getElementById('guided-step-' + tool);
+  if (!step) return;
+  step.classList.remove('active', 'done', 'error');
+  if (state) step.classList.add(state);
+  const status = step.querySelector('.guided-status');
+  if (status) {
+    status.dataset.i18n = statusKey;
+    status.textContent = t(statusKey);
+  }
+}
+
+function commandGuidedSetPhase(phase, statusKey) {
+  commandGuidedPhase = phase;
+  commandGuidedStatusKey = statusKey;
+  commandGuidedSetStep('command', phase === 'done' ? 'done' : (phase === 'error' ? 'error' : 'active'), statusKey);
+  const button = document.getElementById('command-guided-run');
+  if (button) {
+    button.disabled = phase !== 'idle' && phase !== 'done' && phase !== 'error';
+    button.textContent = t(phase === 'done' ? 'command.guidedRerun' : 'command.guidedRun');
+  }
+}
+
+function commandGuidedCollectFixes() {
+  commandGuidedSetPhase('fixes', 'command.guidedFixes');
+  parent.postMessage({ pluginMessage: { type: 'command-collect-fixes', scope: 'page', options: commandGetOptions() } }, '*');
+}
+
+function commandGuidedRunAudit() {
+  commandGuidedSetPhase('kwcag', 'command.guidedKwcag');
+  parent.postMessage({ pluginMessage: { type: 'command-kwcag-krds-audit', scope: 'page', options: commandGetOptions() } }, '*');
+}
+
+function commandGuidedStart() {
+  switchTool('command');
+  commandScope = 'page';
+  const includeOklch = document.getElementById('command-include-oklch-apply');
+  if (includeOklch) includeOklch.checked = false;
+  commandGuidedSetPhase('refresh', 'command.guidedRefreshing');
+  parent.postMessage({ pluginMessage: { type: 'command-refresh', scope: 'page', options: commandGetOptions() } }, '*');
+}
+
+function commandGuidedOpenTool(tool) {
+  switchTool(tool);
+  commandGuidedSetStep(tool, 'active', 'command.guidedInProgress');
+  if (tool === 'style') styleParseCurrentMd(false);
+  if (tool === 'menu') menuSwitchInput('url');
+  if (tool === 'table') tableSwitchTab('unified');
+}
+
+function commandGuidedFail() {
+  if (commandGuidedPhase !== 'idle' && commandGuidedPhase !== 'done') {
+    commandGuidedSetPhase('error', 'command.guidedFailed');
+  }
+}
+
 document.getElementById('command-refresh-selection').addEventListener('click', () => commandRefresh('selection'));
 document.getElementById('command-refresh-page').addEventListener('click', () => commandRefresh('page'));
 document.getElementById('command-cancel-scan').addEventListener('click', commandCancelScan);
@@ -541,6 +610,14 @@ document.getElementById('command-export-tokens').addEventListener('click', comma
 document.getElementById('command-create-report-board').addEventListener('click', commandCreateReportBoard);
 document.getElementById('command-open-folder-maker').addEventListener('click', commandOpenFolderMaker);
 document.getElementById('command-project-type').addEventListener('change', (event) => commandApplyProjectPreset(event.target.value));
+document.getElementById('command-guided-run').addEventListener('click', commandGuidedStart);
+document.querySelectorAll('.guided-step[data-tool]').forEach(step => {
+  step.addEventListener('click', () => {
+    const tool = step.dataset.tool;
+    if (tool === 'command') commandGuidedStart();
+    else commandGuidedOpenTool(tool);
+  });
+});
 
 /* ── Auto-Fix section (Task 7): scan + AB batch apply + per-item apply ──
    Reuses the same scope/options helpers as commandRefresh so the fix engine
@@ -1956,15 +2033,29 @@ window.onmessage = (event) => {
   if (msg.type === 'command-snapshot') {
     commandRenderSnapshot(msg.data);
     if (msg.data && msg.data.previewItems) commandRenderBindingPreview(msg.data.previewItems);
+    if (commandGuidedPhase === 'refresh') {
+      commandGuidedSetPhase('bindings', 'command.guidedBindings');
+      parent.postMessage({ pluginMessage: { type: 'command-preview-color-bindings', scope: 'page', options: commandGetOptions() } }, '*');
+    }
     return;
   }
   if (msg.type === 'command-fixes-preview') {
     commandRenderFixPreview(msg);
+    if (commandGuidedPhase === 'fixes') {
+      const counts = msg.counts || {};
+      if ((counts.A || 0) + (counts.B || 0) > 0) {
+        commandGuidedSetPhase('apply-fixes', 'command.guidedApplyingFixes');
+        parent.postMessage({ pluginMessage: { type: 'command-apply-fixes', tier: 'AB' } }, '*');
+      } else {
+        commandGuidedRunAudit();
+      }
+    }
     return;
   }
   if (msg.type === 'command-fixes-applied') {
     const list = commandGetBindingList();
     list.innerHTML = `<div class="hint">${t('command.fixApplied', msg.applied || 0)}</div>`;
+    if (commandGuidedPhase === 'apply-fixes') commandGuidedRunAudit();
     // Re-scan so counts/chips reflect the post-apply state (mirrors command-refresh).
     parent.postMessage({ pluginMessage: { type: 'command-collect-fixes', scope: commandScope, options: commandGetOptions() } }, '*');
     return;
@@ -1972,19 +2063,36 @@ window.onmessage = (event) => {
   if (msg.type === 'command-bindings-preview') {
     commandRenderSnapshot(msg.data);
     commandRenderBindingPreview(msg.items || []);
+    if (commandGuidedPhase === 'bindings') {
+      const exact = (msg.items || []).filter(item => item.matchType === 'rgb-exact');
+      if (exact.length) {
+        commandGuidedSetPhase('apply-bindings', 'command.guidedApplyingBindings');
+        const options = commandGetOptions();
+        options.includeOklchApply = false;
+        parent.postMessage({ pluginMessage: { type: 'command-apply-color-bindings', scope: 'page', changes: exact, options } }, '*');
+      } else {
+        commandGuidedCollectFixes();
+      }
+    }
     return;
   }
   if (msg.type === 'command-apply-result') {
     const list = commandGetBindingList('binding');
     list.innerHTML = `<div class="hint">${t('command.applied', msg.applied || 0, msg.skipped || 0)}</div>`;
+    if (commandGuidedPhase === 'apply-bindings') commandGuidedCollectFixes();
     return;
   }
   if (msg.type === 'command-kwcag-krds-audit-result') {
     commandRenderKwcagKrdsAudit(msg);
+    if (commandGuidedPhase === 'kwcag') {
+      commandGuidedSetPhase('component-qa', 'command.guidedComponentQa');
+      parent.postMessage({ pluginMessage: { type: 'command-component-qa', scope: 'page', options: commandGetOptions() } }, '*');
+    }
     return;
   }
   if (msg.type === 'command-component-qa-result') {
     commandRenderComponentQa(msg);
+    if (commandGuidedPhase === 'component-qa') commandGuidedSetPhase('done', 'command.guidedComplete');
     return;
   }
   if (msg.type === 'command-token-governance-result') {
@@ -2020,6 +2128,7 @@ window.onmessage = (event) => {
   if (msg.type === 'command-error') {
     const list = commandGetBindingList();
     list.innerHTML = `<div class="status error">${commandEscape(t('command.error', msg.message || 'Unknown error'))}</div>`;
+    commandGuidedFail();
     return;
   }
 
@@ -2031,6 +2140,7 @@ window.onmessage = (event) => {
     tableUpdateBtn(); btn.textContent = t('table.generate');
     status.textContent = t('table.done', msg.rows, msg.cols);
     status.className = 'status ok';
+    commandGuidedSetStep('table', 'done', 'command.guidedComplete');
     return;
   }
   if (msg.type === 'table-error') {
@@ -2053,6 +2163,7 @@ window.onmessage = (event) => {
     document.getElementById('menu-generate').disabled = false;
     document.getElementById('menu-progress-wrap').style.display = 'none';
     menuShowResult(t('menu.done', msg.count), 'success');
+    commandGuidedSetStep('menu', 'done', 'command.guidedComplete');
     return;
   }
   if (msg.type === 'menu-template-registered') {
@@ -2091,6 +2202,7 @@ window.onmessage = (event) => {
     else if (msg.type === 'style-draw-done') el.textContent = t('style.boardDone', msg.textStyleCount || 9, msg.fontFamily ? t('style.summaryFont', msg.fontFamily) : '');
     else el.textContent = t('style.compDone', msg.btnVariantCount, msg.inputVariantCount);
     el.className = 'result success'; el.style.display = 'block';
+    if (msg.type === 'style-done') commandGuidedSetStep('style', 'done', 'command.guidedComplete');
     return;
   }
   if (msg.type === 'style-error') {
@@ -2105,10 +2217,12 @@ window.onmessage = (event) => {
   /* ── Design QA Diff ── */
   if (msg.type === 'qa-rasterize-result') {
     qaRenderRasterResult(msg);
+    if (!msg.error) commandGuidedSetStep('designqa', 'active', 'command.guidedInProgress');
     return;
   }
   if (msg.type === 'qa-commit-result') {
     qaRenderCommitResult(msg);
+    if (!msg.error) commandGuidedSetStep('designqa', 'active', 'command.guidedCopyNote');
     return;
   }
 };
@@ -2572,6 +2686,9 @@ document.getElementById('qa-commit').addEventListener('click', () => {
   }, '*');
   result.textContent = '';
 });
-document.getElementById('qa-copy-note').addEventListener('click', qaCopyAgentNote);
+document.getElementById('qa-copy-note').addEventListener('click', () => {
+  qaCopyAgentNote();
+  commandGuidedSetStep('designqa', 'done', 'command.guidedComplete');
+});
 qaInitOverlay();
 qaUpdateAgentNote();

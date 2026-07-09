@@ -172,6 +172,7 @@ async function run() {
             return x > 0.5 && y > 0.5;
           };
           const steps = [...document.querySelectorAll('#command-pipeline .pipeline-step')];
+          const guidedSteps = [...document.querySelectorAll('#guided-workflow .guided-step')];
           const problems = [];
           for (let i = 0; i < steps.length; i++) {
             for (let j = i + 1; j < steps.length; j++) {
@@ -185,6 +186,8 @@ async function run() {
             summary: document.getElementById('command-pipeline-summary')?.textContent.trim() || '',
             stepCount: steps.length,
             stepTitles: steps.map((step) => step.querySelector('.pipeline-step-title')?.textContent.trim() || ''),
+            guidedStepCount: guidedSteps.length,
+            guidedOverflow: guidedSteps.some((step) => step.scrollWidth > step.clientWidth + 1 || step.scrollHeight > step.clientHeight + 1),
             problems,
             pipelineRect: rect(document.getElementById('command-pipeline')),
           };
@@ -197,6 +200,8 @@ async function run() {
     assert(commandValue.projectType === 'public-education', `default project type should be public-education, got ${commandValue.projectType}`);
     assert(commandValue.tablePreset === 'krds', `public/education preset should initialize table preset to krds, got ${commandValue.tablePreset}`);
     assert(commandValue.stepCount === 4, `Project Pipeline should render 4 steps, got ${commandValue.stepCount}`);
+    assert(commandValue.guidedStepCount === 5, `Guided Workflow should render 5 tool steps, got ${commandValue.guidedStepCount}`);
+    assert(commandValue.guidedOverflow === false, 'Guided Workflow controls should not overflow their containers');
     for (const title of ['Setup', 'Generate', 'QA', 'Handoff']) {
       assert(commandValue.stepTitles.includes(title), `Project Pipeline is missing ${title}`);
     }

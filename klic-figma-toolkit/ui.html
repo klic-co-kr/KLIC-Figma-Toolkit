@@ -57,6 +57,20 @@
   }
   .command-grid { display: grid; grid-template-columns: 1fr 112px; min-height: 386px; }
   .command-main { padding: 14px; }
+  .guided-workflow { margin: 10px 0; border: 1px solid #303030; border-radius: 8px; background: #161616; padding: 10px; }
+  .guided-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+  .guided-head .btn-primary { flex: 0 0 auto; padding: 7px 10px; font-size: 10px; }
+  .guided-steps { display: grid; grid-template-columns: 1fr; gap: 4px; }
+  .guided-step { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 8px; width: 100%; min-height: 38px; padding: 5px 7px; border: 1px solid #2c2c2c; border-radius: 6px; background: #1c1c1c; color: #ddd; text-align: left; cursor: pointer; }
+  .guided-step:hover { border-color: #18a0fb; }
+  .guided-step.active { border-color: #18a0fb; background: #162633; }
+  .guided-step.done { border-color: #2f6f50; background: #16231c; }
+  .guided-step.error { border-color: #8a4545; background: #291919; }
+  .guided-index { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: #303030; color: #bbb; font-size: 10px; font-weight: 700; }
+  .guided-copy { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .guided-copy strong { font-size: 10px; color: #fff; }
+  .guided-copy small { font-size: 9px; color: #777; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .guided-status { font-size: 9px; color: #8dd4ff; white-space: nowrap; }
   .health-row { display: grid; grid-template-columns: 112px 1fr; gap: 12px; margin-bottom: 12px; }
   .health-score {
     border: 1px solid #333; border-radius: 10px; background: #1b1b1b;
@@ -496,6 +510,33 @@
               </label>
             </div>
             <div class="command-pipeline" id="command-pipeline"></div>
+          </div>
+
+          <div class="guided-workflow" id="guided-workflow">
+            <div class="guided-head">
+              <div>
+                <div class="section-label" data-i18n="command.guidedTitle">Guided Workflow</div>
+                <div class="command-pipeline-summary" data-i18n="command.guidedDesc">Run the safe Command Center sequence, then continue through each production tool.</div>
+              </div>
+              <button class="btn btn-primary" id="command-guided-run" data-i18n="command.guidedRun">Run safe command workflow</button>
+            </div>
+            <div class="guided-steps">
+              <button class="guided-step" id="guided-step-command" data-tool="command">
+                <span class="guided-index">1</span><span class="guided-copy"><strong data-i18n="command.guidedCommand">Command Center</strong><small data-i18n="command.guidedCommandDesc">Refresh → RGB exact → safe fixes → QA</small></span><span class="guided-status" data-i18n="command.guidedReady">Ready</span>
+              </button>
+              <button class="guided-step" id="guided-step-style" data-tool="style">
+                <span class="guided-index">2</span><span class="guided-copy"><strong data-i18n="command.guidedStyle">Style Guide</strong><small data-i18n="command.guidedStyleDesc">Parse MD → create variables → review OKLCH</small></span><span class="guided-status" data-i18n="command.guidedOpen">Open</span>
+              </button>
+              <button class="guided-step" id="guided-step-menu" data-tool="menu">
+                <span class="guided-index">3</span><span class="guided-copy"><strong data-i18n="command.guidedMenu">Menu Generator</strong><small data-i18n="command.guidedMenuDesc">Map CSV → filter categories → register template</small></span><span class="guided-status" data-i18n="command.guidedOpen">Open</span>
+              </button>
+              <button class="guided-step" id="guided-step-table" data-tool="table">
+                <span class="guided-index">4</span><span class="guided-copy"><strong data-i18n="command.guidedTable">Table Builder</strong><small data-i18n="command.guidedTableDesc">Choose input → inspect diagnostics → generate</small></span><span class="guided-status" data-i18n="command.guidedOpen">Open</span>
+              </button>
+              <button class="guided-step" id="guided-step-designqa" data-tool="designqa">
+                <span class="guided-index">5</span><span class="guided-copy"><strong data-i18n="command.guidedDesignQa">Design QA Diff</strong><small data-i18n="command.guidedDesignQaDesc">Capture → annotate → commit → copy note</small></span><span class="guided-status" data-i18n="command.guidedOpen">Open</span>
+              </button>
+            </div>
           </div>
 
           <div class="command-actions">
@@ -994,6 +1035,33 @@ const I18N = {
     'command.pipelineItemTokens': 'Export DTCG/CSS tokens',
     'command.pipelineItemReport': 'Create audit report board',
     'command.pipelineItemPackage': 'Open Folder Maker package',
+    'command.guidedTitle': 'Guided Workflow',
+    'command.guidedDesc': 'Run the safe Command Center sequence, then continue through each production tool.',
+    'command.guidedRun': 'Run safe command workflow',
+    'command.guidedRerun': 'Run again',
+    'command.guidedCommand': 'Command Center',
+    'command.guidedCommandDesc': 'Refresh → RGB exact → safe fixes → QA',
+    'command.guidedStyle': 'Style Guide',
+    'command.guidedStyleDesc': 'Parse MD → create variables → review OKLCH',
+    'command.guidedMenu': 'Menu Generator',
+    'command.guidedMenuDesc': 'Map CSV → filter categories → register template',
+    'command.guidedTable': 'Table Builder',
+    'command.guidedTableDesc': 'Choose input → inspect diagnostics → generate',
+    'command.guidedDesignQa': 'Design QA Diff',
+    'command.guidedDesignQaDesc': 'Capture → annotate → commit → copy note',
+    'command.guidedReady': 'Ready',
+    'command.guidedOpen': 'Open',
+    'command.guidedInProgress': 'In progress',
+    'command.guidedRefreshing': 'Refreshing page',
+    'command.guidedBindings': 'Previewing RGB exact',
+    'command.guidedApplyingBindings': 'Applying RGB exact',
+    'command.guidedFixes': 'Scanning safe fixes',
+    'command.guidedApplyingFixes': 'Applying A+B',
+    'command.guidedKwcag': 'Running KWCAG/KRDS',
+    'command.guidedComponentQa': 'Running Component QA',
+    'command.guidedCopyNote': 'Copy agent note',
+    'command.guidedComplete': 'Complete',
+    'command.guidedFailed': 'Failed',
     'command.refreshSelection': 'Refresh selection',
     'command.refreshPage': 'Refresh page',
     'command.cancelScan': 'Cancel scan',
@@ -1266,6 +1334,33 @@ const I18N = {
     'command.pipelineItemTokens': 'DTCG/CSS 토큰 내보내기',
     'command.pipelineItemReport': '감사 리포트 보드 생성',
     'command.pipelineItemPackage': 'Folder Maker 패키지 열기',
+    'command.guidedTitle': '가이드 워크플로우',
+    'command.guidedDesc': '안전한 Command Center 순서를 실행한 뒤 각 제작 도구로 이어서 작업합니다.',
+    'command.guidedRun': '안전 워크플로우 실행',
+    'command.guidedRerun': '다시 실행',
+    'command.guidedCommand': 'Command Center',
+    'command.guidedCommandDesc': '페이지 갱신 → RGB 정확 → 안전 수리 → QA',
+    'command.guidedStyle': 'Style Guide',
+    'command.guidedStyleDesc': 'MD 파싱 → Variables 생성 → OKLCH 검토',
+    'command.guidedMenu': 'Menu Generator',
+    'command.guidedMenuDesc': 'CSV 매핑 → 분류 필터 → 템플릿 등록',
+    'command.guidedTable': 'Table Builder',
+    'command.guidedTableDesc': '입력 선택 → 진단 확인 → 생성',
+    'command.guidedDesignQa': 'Design QA Diff',
+    'command.guidedDesignQaDesc': '캡처 → 라벨링 → 기록 → 노트 복사',
+    'command.guidedReady': '준비',
+    'command.guidedOpen': '열기',
+    'command.guidedInProgress': '진행 중',
+    'command.guidedRefreshing': '페이지 갱신 중',
+    'command.guidedBindings': 'RGB 정확 미리보기',
+    'command.guidedApplyingBindings': 'RGB 정확 적용 중',
+    'command.guidedFixes': '안전 수리 스캔 중',
+    'command.guidedApplyingFixes': 'A+B 적용 중',
+    'command.guidedKwcag': 'KWCAG/KRDS 실행 중',
+    'command.guidedComponentQa': 'Component QA 실행 중',
+    'command.guidedCopyNote': '에이전트 노트 복사',
+    'command.guidedComplete': '완료',
+    'command.guidedFailed': '실패',
     'command.refreshSelection': '선택 영역 새로고침',
     'command.refreshPage': '페이지 새로고침',
     'command.cancelScan': '스캔 취소',
@@ -1913,6 +2008,7 @@ function commandRenderDynamicI18n() {
   commandRenderProjectPipeline();
   if (commandLastSnapshot) commandRenderSnapshot(commandLastSnapshot);
   if (commandLastPreviewItems && commandLastPreviewItems.length) commandRenderBindingPreview(commandLastPreviewItems);
+  commandGuidedRender();
 }
 
 async function commandCopySmokeEvidence(button) {
@@ -2032,6 +2128,74 @@ function commandRenderSmokeChecks(msg) {
   return `<div class="${msg.passed ? 'hint' : 'status error'}">${msg.passed ? t('command.smokePassed') : commandEscape(t('command.smokeFailed', msg.message))}</div>${rows ? `<div class="command-issues" style="margin-top:8px">${rows}</div>` : ''}${evidence}`;
 }
 
+let commandGuidedPhase = 'idle';
+let commandGuidedStatusKey = 'command.guidedReady';
+
+function commandGuidedRender() {
+  const button = document.getElementById('command-guided-run');
+  if (button) button.textContent = t(commandGuidedPhase === 'done' ? 'command.guidedRerun' : 'command.guidedRun');
+  if (commandGuidedPhase !== 'idle') {
+    const status = document.querySelector('#guided-step-command .guided-status');
+    if (status) status.textContent = t(commandGuidedStatusKey);
+  }
+}
+
+function commandGuidedSetStep(tool, state, statusKey) {
+  const step = document.getElementById('guided-step-' + tool);
+  if (!step) return;
+  step.classList.remove('active', 'done', 'error');
+  if (state) step.classList.add(state);
+  const status = step.querySelector('.guided-status');
+  if (status) {
+    status.dataset.i18n = statusKey;
+    status.textContent = t(statusKey);
+  }
+}
+
+function commandGuidedSetPhase(phase, statusKey) {
+  commandGuidedPhase = phase;
+  commandGuidedStatusKey = statusKey;
+  commandGuidedSetStep('command', phase === 'done' ? 'done' : (phase === 'error' ? 'error' : 'active'), statusKey);
+  const button = document.getElementById('command-guided-run');
+  if (button) {
+    button.disabled = phase !== 'idle' && phase !== 'done' && phase !== 'error';
+    button.textContent = t(phase === 'done' ? 'command.guidedRerun' : 'command.guidedRun');
+  }
+}
+
+function commandGuidedCollectFixes() {
+  commandGuidedSetPhase('fixes', 'command.guidedFixes');
+  parent.postMessage({ pluginMessage: { type: 'command-collect-fixes', scope: 'page', options: commandGetOptions() } }, '*');
+}
+
+function commandGuidedRunAudit() {
+  commandGuidedSetPhase('kwcag', 'command.guidedKwcag');
+  parent.postMessage({ pluginMessage: { type: 'command-kwcag-krds-audit', scope: 'page', options: commandGetOptions() } }, '*');
+}
+
+function commandGuidedStart() {
+  switchTool('command');
+  commandScope = 'page';
+  const includeOklch = document.getElementById('command-include-oklch-apply');
+  if (includeOklch) includeOklch.checked = false;
+  commandGuidedSetPhase('refresh', 'command.guidedRefreshing');
+  parent.postMessage({ pluginMessage: { type: 'command-refresh', scope: 'page', options: commandGetOptions() } }, '*');
+}
+
+function commandGuidedOpenTool(tool) {
+  switchTool(tool);
+  commandGuidedSetStep(tool, 'active', 'command.guidedInProgress');
+  if (tool === 'style') styleParseCurrentMd(false);
+  if (tool === 'menu') menuSwitchInput('url');
+  if (tool === 'table') tableSwitchTab('unified');
+}
+
+function commandGuidedFail() {
+  if (commandGuidedPhase !== 'idle' && commandGuidedPhase !== 'done') {
+    commandGuidedSetPhase('error', 'command.guidedFailed');
+  }
+}
+
 document.getElementById('command-refresh-selection').addEventListener('click', () => commandRefresh('selection'));
 document.getElementById('command-refresh-page').addEventListener('click', () => commandRefresh('page'));
 document.getElementById('command-cancel-scan').addEventListener('click', commandCancelScan);
@@ -2045,6 +2209,14 @@ document.getElementById('command-export-tokens').addEventListener('click', comma
 document.getElementById('command-create-report-board').addEventListener('click', commandCreateReportBoard);
 document.getElementById('command-open-folder-maker').addEventListener('click', commandOpenFolderMaker);
 document.getElementById('command-project-type').addEventListener('change', (event) => commandApplyProjectPreset(event.target.value));
+document.getElementById('command-guided-run').addEventListener('click', commandGuidedStart);
+document.querySelectorAll('.guided-step[data-tool]').forEach(step => {
+  step.addEventListener('click', () => {
+    const tool = step.dataset.tool;
+    if (tool === 'command') commandGuidedStart();
+    else commandGuidedOpenTool(tool);
+  });
+});
 
 /* ── Auto-Fix section (Task 7): scan + AB batch apply + per-item apply ──
    Reuses the same scope/options helpers as commandRefresh so the fix engine
@@ -3460,15 +3632,29 @@ window.onmessage = (event) => {
   if (msg.type === 'command-snapshot') {
     commandRenderSnapshot(msg.data);
     if (msg.data && msg.data.previewItems) commandRenderBindingPreview(msg.data.previewItems);
+    if (commandGuidedPhase === 'refresh') {
+      commandGuidedSetPhase('bindings', 'command.guidedBindings');
+      parent.postMessage({ pluginMessage: { type: 'command-preview-color-bindings', scope: 'page', options: commandGetOptions() } }, '*');
+    }
     return;
   }
   if (msg.type === 'command-fixes-preview') {
     commandRenderFixPreview(msg);
+    if (commandGuidedPhase === 'fixes') {
+      const counts = msg.counts || {};
+      if ((counts.A || 0) + (counts.B || 0) > 0) {
+        commandGuidedSetPhase('apply-fixes', 'command.guidedApplyingFixes');
+        parent.postMessage({ pluginMessage: { type: 'command-apply-fixes', tier: 'AB' } }, '*');
+      } else {
+        commandGuidedRunAudit();
+      }
+    }
     return;
   }
   if (msg.type === 'command-fixes-applied') {
     const list = commandGetBindingList();
     list.innerHTML = `<div class="hint">${t('command.fixApplied', msg.applied || 0)}</div>`;
+    if (commandGuidedPhase === 'apply-fixes') commandGuidedRunAudit();
     // Re-scan so counts/chips reflect the post-apply state (mirrors command-refresh).
     parent.postMessage({ pluginMessage: { type: 'command-collect-fixes', scope: commandScope, options: commandGetOptions() } }, '*');
     return;
@@ -3476,19 +3662,36 @@ window.onmessage = (event) => {
   if (msg.type === 'command-bindings-preview') {
     commandRenderSnapshot(msg.data);
     commandRenderBindingPreview(msg.items || []);
+    if (commandGuidedPhase === 'bindings') {
+      const exact = (msg.items || []).filter(item => item.matchType === 'rgb-exact');
+      if (exact.length) {
+        commandGuidedSetPhase('apply-bindings', 'command.guidedApplyingBindings');
+        const options = commandGetOptions();
+        options.includeOklchApply = false;
+        parent.postMessage({ pluginMessage: { type: 'command-apply-color-bindings', scope: 'page', changes: exact, options } }, '*');
+      } else {
+        commandGuidedCollectFixes();
+      }
+    }
     return;
   }
   if (msg.type === 'command-apply-result') {
     const list = commandGetBindingList('binding');
     list.innerHTML = `<div class="hint">${t('command.applied', msg.applied || 0, msg.skipped || 0)}</div>`;
+    if (commandGuidedPhase === 'apply-bindings') commandGuidedCollectFixes();
     return;
   }
   if (msg.type === 'command-kwcag-krds-audit-result') {
     commandRenderKwcagKrdsAudit(msg);
+    if (commandGuidedPhase === 'kwcag') {
+      commandGuidedSetPhase('component-qa', 'command.guidedComponentQa');
+      parent.postMessage({ pluginMessage: { type: 'command-component-qa', scope: 'page', options: commandGetOptions() } }, '*');
+    }
     return;
   }
   if (msg.type === 'command-component-qa-result') {
     commandRenderComponentQa(msg);
+    if (commandGuidedPhase === 'component-qa') commandGuidedSetPhase('done', 'command.guidedComplete');
     return;
   }
   if (msg.type === 'command-token-governance-result') {
@@ -3524,6 +3727,7 @@ window.onmessage = (event) => {
   if (msg.type === 'command-error') {
     const list = commandGetBindingList();
     list.innerHTML = `<div class="status error">${commandEscape(t('command.error', msg.message || 'Unknown error'))}</div>`;
+    commandGuidedFail();
     return;
   }
 
@@ -3535,6 +3739,7 @@ window.onmessage = (event) => {
     tableUpdateBtn(); btn.textContent = t('table.generate');
     status.textContent = t('table.done', msg.rows, msg.cols);
     status.className = 'status ok';
+    commandGuidedSetStep('table', 'done', 'command.guidedComplete');
     return;
   }
   if (msg.type === 'table-error') {
@@ -3557,6 +3762,7 @@ window.onmessage = (event) => {
     document.getElementById('menu-generate').disabled = false;
     document.getElementById('menu-progress-wrap').style.display = 'none';
     menuShowResult(t('menu.done', msg.count), 'success');
+    commandGuidedSetStep('menu', 'done', 'command.guidedComplete');
     return;
   }
   if (msg.type === 'menu-template-registered') {
@@ -3595,6 +3801,7 @@ window.onmessage = (event) => {
     else if (msg.type === 'style-draw-done') el.textContent = t('style.boardDone', msg.textStyleCount || 9, msg.fontFamily ? t('style.summaryFont', msg.fontFamily) : '');
     else el.textContent = t('style.compDone', msg.btnVariantCount, msg.inputVariantCount);
     el.className = 'result success'; el.style.display = 'block';
+    if (msg.type === 'style-done') commandGuidedSetStep('style', 'done', 'command.guidedComplete');
     return;
   }
   if (msg.type === 'style-error') {
@@ -3609,10 +3816,12 @@ window.onmessage = (event) => {
   /* ── Design QA Diff ── */
   if (msg.type === 'qa-rasterize-result') {
     qaRenderRasterResult(msg);
+    if (!msg.error) commandGuidedSetStep('designqa', 'active', 'command.guidedInProgress');
     return;
   }
   if (msg.type === 'qa-commit-result') {
     qaRenderCommitResult(msg);
+    if (!msg.error) commandGuidedSetStep('designqa', 'active', 'command.guidedCopyNote');
     return;
   }
 };
@@ -4076,7 +4285,10 @@ document.getElementById('qa-commit').addEventListener('click', () => {
   }, '*');
   result.textContent = '';
 });
-document.getElementById('qa-copy-note').addEventListener('click', qaCopyAgentNote);
+document.getElementById('qa-copy-note').addEventListener('click', () => {
+  qaCopyAgentNote();
+  commandGuidedSetStep('designqa', 'done', 'command.guidedComplete');
+});
 qaInitOverlay();
 qaUpdateAgentNote();
 </script>

@@ -124,6 +124,23 @@ assert(code.includes('width: 720') && code.includes('height: 820'), 'figma.showU
 assert(code.includes('function resizePluginUi') && code.includes('figma.ui.resize(next.width, next.height)'), 'code.js must support plugin UI resize presets');
 assert(ui.includes('<title>KLIC Figma Toolkit</title>'), 'ui.html document title must match the manifest/plugin name');
 assert(ui.includes('<span class="brand">KLIC Figma Toolkit</span>'), 'ui.html brand label must match the manifest/plugin name');
+assert(
+  ui.includes('id="command-guided-run"')
+    && ui.includes('id="guided-step-style"')
+    && ui.includes('id="guided-step-menu"')
+    && ui.includes('id="guided-step-table"')
+    && ui.includes('id="guided-step-designqa"'),
+  'Command Center guided workflow controls are incomplete',
+);
+assert(
+  ui.includes("commandGuidedSetPhase('bindings'")
+    && ui.includes("item.matchType === 'rgb-exact'")
+    && ui.includes('options.includeOklchApply = false')
+    && ui.includes("commandGuidedSetPhase('apply-fixes'")
+    && ui.includes("commandGuidedSetPhase('component-qa'")
+    && ui.includes("commandGuidedSetPhase('done'"),
+  'Guided Command Center workflow must enforce RGB-exact-only binding, safe fixes, and final QA order',
+);
 assert(ui.includes('function resizeUi') && ui.includes('UI_SIZE_PRESETS') && ui.includes('klic.uiSize'), 'ui.html must expose persisted UI size presets');
 assert(ui.includes('id="size-compact"') && ui.includes('id="size-default"') && ui.includes('id="size-wide"'), 'ui.html is missing size preset controls');
 assert(!ui.includes('aria-label="Panel size"'), 'Panel size aria-label must be dictionary-backed for i18n');

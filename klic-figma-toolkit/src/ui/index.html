@@ -79,6 +79,33 @@
             <div class="command-pipeline" id="command-pipeline"></div>
           </div>
 
+          <div class="guided-workflow" id="guided-workflow">
+            <div class="guided-head">
+              <div>
+                <div class="section-label" data-i18n="command.guidedTitle">Guided Workflow</div>
+                <div class="command-pipeline-summary" data-i18n="command.guidedDesc">Run the safe Command Center sequence, then continue through each production tool.</div>
+              </div>
+              <button class="btn btn-primary" id="command-guided-run" data-i18n="command.guidedRun">Run safe command workflow</button>
+            </div>
+            <div class="guided-steps">
+              <button class="guided-step" id="guided-step-command" data-tool="command">
+                <span class="guided-index">1</span><span class="guided-copy"><strong data-i18n="command.guidedCommand">Command Center</strong><small data-i18n="command.guidedCommandDesc">Refresh → RGB exact → safe fixes → QA</small></span><span class="guided-status" data-i18n="command.guidedReady">Ready</span>
+              </button>
+              <button class="guided-step" id="guided-step-style" data-tool="style">
+                <span class="guided-index">2</span><span class="guided-copy"><strong data-i18n="command.guidedStyle">Style Guide</strong><small data-i18n="command.guidedStyleDesc">Parse MD → create variables → review OKLCH</small></span><span class="guided-status" data-i18n="command.guidedOpen">Open</span>
+              </button>
+              <button class="guided-step" id="guided-step-menu" data-tool="menu">
+                <span class="guided-index">3</span><span class="guided-copy"><strong data-i18n="command.guidedMenu">Menu Generator</strong><small data-i18n="command.guidedMenuDesc">Map CSV → filter categories → register template</small></span><span class="guided-status" data-i18n="command.guidedOpen">Open</span>
+              </button>
+              <button class="guided-step" id="guided-step-table" data-tool="table">
+                <span class="guided-index">4</span><span class="guided-copy"><strong data-i18n="command.guidedTable">Table Builder</strong><small data-i18n="command.guidedTableDesc">Choose input → inspect diagnostics → generate</small></span><span class="guided-status" data-i18n="command.guidedOpen">Open</span>
+              </button>
+              <button class="guided-step" id="guided-step-designqa" data-tool="designqa">
+                <span class="guided-index">5</span><span class="guided-copy"><strong data-i18n="command.guidedDesignQa">Design QA Diff</strong><small data-i18n="command.guidedDesignQaDesc">Capture → annotate → commit → copy note</small></span><span class="guided-status" data-i18n="command.guidedOpen">Open</span>
+              </button>
+            </div>
+          </div>
+
           <div class="command-actions">
             <button class="btn" id="command-refresh-selection" data-i18n="command.refreshSelection">Refresh selection</button>
             <button class="btn" id="command-refresh-page" data-i18n="command.refreshPage">Refresh page</button>
