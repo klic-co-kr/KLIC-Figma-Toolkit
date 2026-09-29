@@ -18,9 +18,11 @@
 
 <br/>
 
-<video src="docs/intro/klic-intro.mp4" controls muted loop preload="metadata"></video>
+<a href="https://github.com/klic-co-kr/KLIC-Figma-Toolkit/blob/main/docs/intro/klic-intro.mp4">
+  <img src="docs/intro/klic-intro-poster.png" alt="▶ KLIC Toolkit 82초 소개 영상 — 클릭해서 재생" width="720"/>
+</a>
 
-<p><sub>82초 소개 영상 — 반복은 도구에게, 설계는 사람에게</sub></p>
+<p><sub>▶ 82초 소개 영상 · 클릭하면 재생됩니다 — 반복은 도구에게, 설계는 사람에게</sub></p>
 
 <br/>
 
