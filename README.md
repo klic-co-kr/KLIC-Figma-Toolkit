@@ -18,6 +18,12 @@
 
 <br/>
 
+<video src="docs/intro/klic-intro.mp4" controls muted loop preload="metadata"></video>
+
+<p><sub>82초 소개 영상 — 반복은 도구에게, 설계는 사람에게</sub></p>
+
+<br/>
+
 </div>
 
 ---
